@@ -13,3 +13,4 @@ python-dotenv
 markdown
 wikipedia
 weasyprint
+whitenoise
