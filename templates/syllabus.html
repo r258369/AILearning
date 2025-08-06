@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Syllabus{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .syllabus-page-header {
+            text-align: left;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        .syllabus-page-header h1 {
+            font-size: 2.2em;
+            color: var(--primary-blue);
+            margin-bottom: 5px;
+        }
+
+        .syllabus-page-header p {
+            font-size: 1.1em;
+            color: var(--text-color-light);
+        }
+
+        .syllabus-content-wrapper {
+            background-color: var(--background-white);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: var(--soft-shadow);
+        }
+
+        .syllabus-week-card {
+            background-color: var(--soft-gray-accent);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: var(--soft-shadow);
+        }
+
+        .syllabus-week-card h3 {
+            color: var(--dark-text);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .syllabus-week-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .syllabus-week-card li {
+            margin-bottom: 10px;
+            color: var(--text-color);
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .syllabus-week-card li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Styles for pre tag within syllabus to handle long lines - fallback */
+        .syllabus-content-wrapper pre {
+            white-space: pre-wrap; /* CSS3 */
+            white-space: -moz-pre-wrap; /* Firefox */
+            white-space: -pre-wrap; /* Opera <7 */
+            white-space: -o-pre-wrap; /* Opera 7 */
+            word-wrap: break-word; /* IE */
+            max-width: 100%; /* Ensure it respects its container */
+            overflow-x: auto; /* Add horizontal scrollbar if still needed, but wrap first */
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="syllabus-page-header">
+            <h1>Your Personalized Learning Syllabus</h1>
+            <p>Here's your tailored learning plan to guide your studies.</p>
+        </div>
+
+        <div class="syllabus-content-wrapper">
+            {% if syllabus %}
+            <p>{{ syllabus|safe }}</p>
+            {% else %}
+                
+                <p>It looks like your syllabus hasn't been generated yet. Please ensure you've completed the <a href="{% url 'onboarding_quiz' %}">Onboarding Quiz</a> to create your personalized plan.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %} 

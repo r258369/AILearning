@@ -1,0 +1,587 @@
+/* Dashboard Specific Styles */
+/* No body background here, use global styles.css */
+/* Add animations and transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-header,
+.metric-card,
+.report-section,
+.recent-activity-section {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.metric-card {
+  animation-delay: calc(var(--card-index, 0) * 0.1s);
+  transition: all 0.3s ease;
+}
+
+.metric-card:nth-child(1) {
+  --card-index: 1;
+}
+.metric-card:nth-child(2) {
+  --card-index: 2;
+}
+.metric-card:nth-child(3) {
+  --card-index: 3;
+}
+.metric-card:nth-child(4) {
+  --card-index: 4;
+}
+
+.dashboard-header {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dashboard-header:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 30px 0 rgba(80, 112, 180, 0.15);
+}
+
+.profile-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profile-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px 0 rgba(80, 112, 180, 0.15);
+}
+
+.recent-activity-item {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.recent-activity-item:hover {
+  transform: translateX(10px);
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+.badge-item {
+  transition: all 0.3s ease;
+}
+
+.badge-item:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.info-card {
+  transition: all 0.2s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  background: #eef2ff;
+}
+
+.cta-btn {
+  transition: all 0.3s ease;
+}
+
+.value {
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover .value {
+  transform: scale(1.1);
+  color: #1d4ed8;
+}
+
+/* Progress bar styles */
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background-color: #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: black;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* So clicks pass through */
+}
+
+/* Status badge styles */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-started {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-inprogress {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-notstarted {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Progress table styles */
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.progress-table th,
+.progress-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.progress-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.progress-table tr:hover {
+  background-color: #f9fafb;
+}
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #e0e7ef 0%, #c7d2fe 100%);
+  border-radius: 20px;
+  box-shadow: 0 6px 24px 0 rgba(80, 112, 180, 0.1);
+  padding: 36px 40px 36px 40px;
+  margin-bottom: 40px;
+  position: relative;
+}
+.dashboard-header .greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dashboard-header .greeting h1 {
+  font-size: 2.7em;
+  color: #2563eb;
+  font-weight: 800;
+  margin: 0 0 5px 0;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+  text-shadow: 0 2px 8px rgba(80, 112, 180, 0.1);
+}
+.dashboard-header .greeting p {
+  font-size: 1.15em;
+  color: #2563eb;
+  margin: 0;
+}
+.dashboard-header .profile-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px 0 rgba(80, 112, 180, 0.1);
+  padding: 18px 28px;
+  gap: 18px;
+  min-width: 320px;
+}
+.dashboard-header .avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px 0 rgba(80, 112, 180, 0.1);
+}
+.dashboard-header .profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dashboard-header .profile-info .info-row {
+  font-size: 1em;
+  color: #374151;
+  font-weight: 500;
+}
+.dashboard-header .profile-info .info-row strong {
+  color: #2563eb;
+  font-weight: 700;
+}
+.dashboard-header .cta-btn {
+  margin-top: 14px;
+  background: linear-gradient(90deg, #10b981 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 0.8em;
+  font-weight: 700;
+  box-shadow: 0 2px 8px 0 rgba(80, 112, 180, 0.1);
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  outline: none;
+  width: 100px;
+  border-bottom: none !important;
+  text-decoration: none !important;
+}
+.dashboard-header .cta-btn:hover {
+  background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);
+  box-shadow: 0 4px 16px 0 rgba(80, 112, 180, 0.16);
+}
+.dashboard-header .profile-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.dashboard-header .info-card {
+  background: #f3f4f6;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px 0 rgba(80, 112, 180, 0.07);
+  padding: 10px 18px 10px 14px;
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  font-size: 1em;
+  color: #374151;
+  font-weight: 500;
+  gap: 8px;
+}
+.dashboard-header .info-card strong {
+  color: #2563eb;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.dashboard-header .info-card .info-icon {
+  font-size: 1.1em;
+  color: #60a5fa;
+  margin-right: 4px;
+}
+@media (max-width: 800px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 28px 16px;
+  }
+  .dashboard-header .profile-card {
+    min-width: 0;
+    width: 100%;
+    margin-top: 18px;
+  }
+}
+
+.main-content,
+.sidebar-content {
+  width: 100%; /* Ensure these take up 100% of their allocated grid column */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+.chart-section,
+.recent-activity-section,
+.recommendations-section {
+  background-color: var(--background-white);
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: var(--soft-shadow);
+}
+
+.chart-section h2,
+.recent-activity-section h2,
+.recommendations-section h2 {
+  color: var(--dark-text);
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.8em;
+}
+
+.recent-activity-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--subtle-divider-gray);
+}
+
+.recent-activity-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.activity-icon {
+  font-size: 1.5em;
+  color: var(--secondary-indigo);
+  margin-right: 15px;
+  width: 30px;
+  text-align: center;
+}
+
+.activity-details p {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.activity-details .title {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.activity-details .time {
+  font-size: 0.85em;
+  color: var(--text-color-light);
+}
+
+/* Styles for pre tag within syllabus to handle long lines */
+.syllabus-content pre {
+  white-space: pre-wrap; /* CSS3 */
+  white-space: -moz-pre-wrap; /* Firefox */
+  white-space: -pre-wrap; /* Opera <7 */
+  white-space: -o-pre-wrap; /* Opera 7 */
+  word-wrap: break-word; /* IE */
+  max-width: 100%; /* Ensure it respects its container */
+  overflow-x: auto; /* Add horizontal scrollbar if still needed, but wrap first */
+}
+/* Progress Report styles from progress_report.html */
+.report-container {
+  width: 100%;
+  margin: 0 0 40px 0;
+  padding: 30px 0;
+}
+.report-section {
+  margin-bottom: 40px;
+  background: linear-gradient(90deg, #f8fafc 0%, #e0e7ef 100%);
+  border-radius: 18px;
+  box-shadow: 0 6px 24px 0 rgba(80, 112, 180, 0.1);
+  padding: 32px 24px 32px 24px;
+  position: relative;
+}
+.report-section h2 {
+  color: #2563eb;
+  margin-bottom: 20px;
+  font-size: 2em;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.report-section h2 .icon {
+  font-size: 1.2em;
+  color: #10b981;
+  background: #e0f7ef;
+  border-radius: 50%;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.quiz-charts-flex {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px 0 rgba(80, 112, 180, 0.08);
+  padding: 24px 16px;
+  transition: box-shadow 0.2s;
+}
+.quiz-charts-flex:hover {
+  box-shadow: 0 6px 24px 0 rgba(80, 112, 180, 0.16);
+}
+.quiz-charts-flex .divider {
+  width: 2px;
+  min-height: 180px;
+  background: linear-gradient(90deg, #f8fafc 0%, #e0e7ef 100%);
+  margin: 0 18px;
+  border-radius: 2px;
+  align-self: center;
+  display: none;
+}
+@media (min-width: 700px) {
+  .quiz-charts-flex .divider {
+    display: block;
+  }
+}
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+.progress-table th,
+.progress-table td {
+  border: 1px solid var(--light-gray);
+  padding: 12px;
+  text-align: left;
+}
+.progress-table th {
+  background-color: var(--light-gray);
+  color: var(--dark-text);
+}
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px;
+}
+.badge-item {
+  text-align: center;
+  padding: 15px;
+  background-color: var(--light-white);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+.badge-item img {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 10px;
+}
+.badge-item p {
+  font-weight: bold;
+  color: var(--secondary-indigo);
+}
+/* Dashboard Container Grid */
+.dashboard-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.dashboard-card-header {
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: var(--primary-blue);
+}
+
+.dashboard-item {
+  margin-bottom: 10px;
+}
+
+/* Navbar specific styles for dashboard */
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-right: 15px;
+  transition: color 0.3s ease;
+}
+
+.icon-btn:hover {
+  color: var(--primary-blue);
+}
+
+.user-avatar-dropdown {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--subtle-divider-gray);
+  transition: border-color 0.3s ease;
+}
+
+.user-avatar:hover {
+  border-color: var(--primary-blue);
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: var(--background-white);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  right: 0; /* Align dropdown to the right of the avatar */
+  margin-top: 10px; /* Space between avatar and dropdown */
+}
+
+.dropdown-content a {
+  color: var(--text-color);
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  transition: background-color 0.3s ease;
+}
+
+.dropdown-content a:hover {
+  background-color: var(--soft-gray-accent);
+}
+
+.dropdown-content.show {
+  display: block;
+}
+
+/* Ensure content sections respect their parent's width */
+.chart-section,
+.syllabus-section,
+.recent-activity-section {
+  max-width: 100%; /* Ensure they don't overflow their grid column */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+/* Make sure any images or other media within content sections are responsive */
+.chart-section img,
+.syllabus-section img,
+.recent-activity-section img,
+.chart-section iframe,
+.syllabus-section iframe,
+.recent-activity-section iframe {
+  max-width: 100%;
+  height: auto;
+  display: block; /* Remove extra space below images */
+}
+
+/* Potentially adjust the main-content to also use flex-wrap if child elements are large */
+.main-content {
+  overflow-x: hidden; /* Hide horizontal scrollbar if content overflows, in case max-width isn't enough */
+}

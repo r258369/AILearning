@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lesson Page{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .lesson-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .lesson-header h1 {
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+        }
+        .lesson-header p {
+            color: var(--text-color-light);
+        }
+        .lesson-main-content {
+            display: flex;
+            gap: 20px;
+        }
+        .lesson-video-section {
+            flex: 3;
+        }
+        .playlist-sidebar {
+            flex: 1;
+            background-color: var(--background-white);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--soft-shadow);
+            max-height: 600px;
+            margin-top: 30px;
+            overflow-y: auto;
+        }
+        .playlist-sidebar h3 {
+            color: var(--secondary-indigo);
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .topic-section {
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--subtle-divider-gray);
+            padding-bottom: 15px;
+        }
+        .topic-section:last-child {
+            border-bottom: none;
+        }
+        .topic-title {
+            font-weight: bold;
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .playlist-sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .playlist-sidebar li {
+            margin-bottom: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+            border: 1px solid transparent;
+        }
+        .playlist-sidebar li:hover {
+            background-color: var(--soft-gray-accent);
+            border-color: var(--primary-blue);
+        }
+        .playlist-sidebar li.active {
+            background-color: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            box-shadow: var(--soft-shadow);
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+        .video-info {
+            background-color: var(--background-white);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--soft-shadow);
+            margin-bottom: 20px;
+        }
+        .video-info h2 {
+            color: var(--primary-blue);
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .video-info p {
+            color: var(--text-color-light);
+            margin-bottom: 0;
+        }
+        .lesson-content-display {
+            margin-top: 20px;
+        }
+        .video-card {
+            display: none; /* Hidden by default */
+        }
+        .video-card.active {
+            display: block; /* Only active card is shown */
+        }
+        .no-videos-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-color-light);
+        }
+        .no-videos-message i {
+            font-size: 3em;
+            color: var(--subtle-divider-gray);
+            margin-bottom: 20px;
+        }
+        .video-actions {
+            margin-top: 15px;
+        }
+        .mark-complete-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mark-complete-btn:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        .mark-complete-btn.completed {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            cursor: not-allowed;
+        }
+        .mark-complete-btn.completed:hover {
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    {% csrf_token %}
+    <div class="container">
+        <div class="lesson-header">
+            <h1>{{ course_name }} Course</h1>
+            <p>Watch personalized educational videos based on your syllabus topics.</p>
+        </div>
+
+        {% if recommended_videos %}
+            <!-- Debug info -->
+            <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px;">
+                <strong>Debug Info:</strong> Found {{ recommended_videos|length }} topics with videos
+                {% for topic_data in recommended_videos %}
+                    <br>- {{ topic_data.topic }}: {{ topic_data.videos|length }} videos
+                {% endfor %}
+            </div>
+            
+            <div class="lesson-main-content">
+                <div class="lesson-video-section">
+                    <div class="lesson-content-display">
+                        {% for topic_data in recommended_videos %}
+                            {% for video in topic_data.videos %}
+                                <div class="video-card {% if forloop.first and forloop.parentloop.first %}active{% endif %}" data-topic="{{ topic_data.topic }}" data-video-index="{{ forloop.counter0 }}">
+                                    <div class="video-info">
+                                        <h2>{{ topic_data.topic }}</h2>
+                                        <p><strong>{{ video.title }}</strong></p>
+                                        <p>Channel: {{ video.channel_title }}</p>
+                                        <div class="video-actions">
+                                            {% if video.video_id in completed_videos %}
+                                                <button class="btn btn-success mark-complete-btn completed" 
+                                                        data-video-id="{{ video.video_id }}" 
+                                                        data-video-title="{{ video.title }}"
+                                                        data-topic="{{ topic_data.topic }}"
+                                                        disabled>
+                                                    <i class="fas fa-check-circle"></i> Completed
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-success mark-complete-btn" 
+                                                        data-video-id="{{ video.video_id }}" 
+                                                        data-video-title="{{ video.title }}"
+                                                        data-topic="{{ topic_data.topic }}">
+                                                    <i class="fas fa-check"></i> Mark as Complete
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="video-container">
+                                        <iframe src="https://www.youtube.com/embed/{{ video.video_id }}?enablejsapi=1&autoplay=0" 
+                                                frameborder="0" 
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                allowfullscreen>
+                                        </iframe>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="playlist-sidebar">
+                    <h3>Video Playlist</h3>
+                    {% for topic_data in recommended_videos %}
+                        <div class="topic-section">
+                            <div class="topic-title">{{ topic_data.topic }}</div>
+                            <ul>
+                                {% for video in topic_data.videos %}
+                                    <li class="{% if forloop.first and forloop.parentloop.first %}active{% endif %}" data-topic="{{ topic_data.topic }}" data-video-index="{{ forloop.counter0 }}">
+                                        {{ video.title }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        {% else %}
+            <div class="no-videos-message">
+                <i class="fas fa-video"></i>
+                <h3>No Videos Available</h3>
+                <p>Complete your onboarding quiz to generate personalized video recommendations.</p>
+                <a href="{% url 'onboarding_quiz' %}" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Start Learning
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Load the IFrame Player API code asynchronously.
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onPlayerReady(event) {
+            // Optional: You can do something when player is ready
+        }
+
+        function onPlayerStateChange(event) {
+            // Optional: You can respond to player state changes
+        }
+
+        function onYouTubeIframeAPIReady() {
+            const videoCards = document.querySelectorAll('.video-card');
+            const playlistItems = document.querySelectorAll('.playlist-sidebar li');
+            let currentVideoIndex = 0;
+
+            let players = [];
+
+            videoCards.forEach((card, index) => {
+                const iframe = card.querySelector('iframe');
+                if (iframe) {
+                    players[index] = new YT.Player(iframe, {
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
+                        },
+                        playerVars: {
+                            'enablejsapi': 1,
+                            'autoplay': 0,
+                        }
+                    });
+                }
+            });
+
+            function stopAllVideos() {
+                players.forEach(player => {
+                    if (player && typeof player.stopVideo === 'function') {
+                        player.stopVideo();
+                    }
+                });
+            }
+
+            function updateVideoDisplay() {
+                stopAllVideos();
+
+                videoCards.forEach((card, index) => {
+                    if (index === currentVideoIndex) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                });
+
+                playlistItems.forEach((item, index) => {
+                    if (index === currentVideoIndex) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+            }
+
+            playlistItems.forEach((item, index) => {
+                item.addEventListener('click', () => {
+                    currentVideoIndex = index;
+                    updateVideoDisplay();
+                });
+            });
+
+            // Show first video by default
+            if (videoCards.length > 0) {
+                updateVideoDisplay();
+            }
+        }
+
+        // Handle mark as complete functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const markCompleteButtons = document.querySelectorAll('.mark-complete-btn:not(.completed)');
+            
+            markCompleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const videoId = this.getAttribute('data-video-id');
+                    const videoTitle = this.getAttribute('data-video-title');
+                    const topic = this.getAttribute('data-topic');
+                    
+                    // Disable button to prevent double-clicking
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
+                    
+                    // Send AJAX request to mark video as complete
+                    fetch('{% url "mark_video_complete" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({
+                            video_id: videoId,
+                            video_title: videoTitle,
+                            topic: topic
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update button appearance
+                            this.classList.add('completed');
+                            this.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+                            this.disabled = true;
+                            
+                            // Show success message
+                            showNotification('Video marked as complete!', 'success');
+                        } else {
+                            // Re-enable button on error
+                            this.disabled = false;
+                            this.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
+                            showNotification('Error marking video as complete. Please try again.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        // Re-enable button on error
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
+                        showNotification('Error marking video as complete. Please try again.', 'error');
+                    });
+                });
+            });
+            
+            // Function to show notifications
+            function showNotification(message, type) {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    color: white;
+                    font-weight: 600;
+                    z-index: 1000;
+                    animation: slideIn 0.3s ease;
+                    background: ${type === 'success' ? '#10b981' : '#ef4444'};
+                `;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                // Remove notification after 3 seconds
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 3000);
+            }
+            
+            // Add CSS animations for notifications
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        });
+    </script>
+{% endblock %} 
+
+{% block extra_js %}
+<script>
+
+</script>
+{% endblock %} 

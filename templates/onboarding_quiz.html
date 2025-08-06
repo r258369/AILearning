@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Onboarding Quiz{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    :root {
+        --light-gray: #f3f4f6;
+        --primary-blue: #007CFF;
+        --dark-text: #1f2937;
+        --border-color: #d1d5db;
+        --input-background: #ffffff;
+        --text-color: #111827;
+        --primary-blue-rgb: 0, 124, 255;
+    }
+
+    .quiz-container {
+        max-width: 700px;
+        margin: 50px auto;
+        padding: 30px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--dark-text);
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 1em;
+        color: var(--text-color);
+        background-color: var(--input-background);
+    }
+
+    .form-group ul.errorlist {
+        color: #dc3545;
+        font-size: 0.9em;
+        margin-top: 5px;
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        background-color: var(--primary-blue);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    /* Loader Wrapper */
+    #custom-loader-wrapper {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(255, 255, 255, 0.95);
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+
+    /* Gradient Animated Text Loader */
+    .gradient-text {
+        font-size: 4rem;
+        font-weight: 900;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(90deg, #973BED 0%, #007CFF 50%, #FFC800 70%, #F0F 100%);
+        background-size: 200% 100%;
+        background-position: 0% 0%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gradientShift 4s linear infinite;
+        letter-spacing: 0.15em;
+    }
+
+    @keyframes gradientShift {
+        0% {
+            background-position: 0% 0%;
+        }
+        100% {
+            background-position: 200% 0%;
+        }
+    }
+
+    /* Optional: bouncing animation for each letter */
+    .gradient-text span {
+        display: inline-block;
+        animation: bounce 1.2s ease-in-out infinite;
+    }
+    .gradient-text span:nth-child(1) { animation-delay: 0s; }
+    .gradient-text span:nth-child(2) { animation-delay: 0.1s; }
+    .gradient-text span:nth-child(3) { animation-delay: 0.2s; }
+    .gradient-text span:nth-child(4) { animation-delay: 0.3s; }
+
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Loader -->
+<div id="custom-loader-wrapper" class="flex-center">
+    <div class="gradient-text" aria-label="Loading">
+        <span>W</span><span>A</span><span>I</span><span>T</span>
+    </div>
+</div>
+
+<!-- Quiz Form -->
+<div class="quiz-container card" id="quiz-content">
+    <h2>Onboarding Quiz</h2>
+    <form method="post" action="{% url 'onboarding_quiz' %}" id="quiz-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="id_learning_style">Primary learning style:</label>
+            {{ form.learning_style }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_preferred_subjects">Preferred subjects:</label>
+            {{ form.preferred_subjects }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_skill_level">Skill level:</label>
+            {{ form.skill_level }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_specific_goals">Learning goals:</label>
+            {{ form.specific_goals }}
+        </div>
+
+        <button type="submit" class="btn">Submit</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('quiz-form');
+    const loader = document.getElementById('custom-loader-wrapper');
+    const content = document.getElementById('quiz-content');
+
+    form.addEventListener('submit', function () {
+        requestAnimationFrame(() => {
+            loader.style.display = 'flex';
+            content.style.display = 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

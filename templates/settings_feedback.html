@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Settings & Feedback{% endblock %}
+
+{% block extra_css %}
+    <style>
+        /* Remove body background here to use global styles.css */
+        .settings-container {
+            max-width: 700px;
+            margin: 60px auto 40px auto;
+            padding: 40px 24px 32px 24px;
+            background: rgba(255, 255, 255, 0.82);
+            border-radius: 24px;
+            box-shadow: 0 8px 40px 0 rgba(165, 180, 252, 0.10), 0 1.5px 4px rgba(0,0,0,0.04);
+            backdrop-filter: blur(14px) saturate(140%);
+            border: 1.5px solid rgba(165, 180, 252, 0.13);
+            position: relative;
+        }
+        .settings-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            pointer-events: none;
+            box-shadow: 0 0 32px 8px rgba(165,180,252,0.07), 0 0 0 2px rgba(165,180,252,0.07);
+        }
+        .settings-section {
+            margin-bottom: 40px;
+        }
+        .settings-section h2 {
+            color: #6366f1;
+            margin-bottom: 20px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .form-section {
+            background: rgba(255,255,255,0.96);
+            padding: 32px 28px 28px 28px;
+            border-radius: 18px;
+            box-shadow: 0 4px 32px 0 rgba(165,180,252,0.10);
+            border: 1.5px solid rgba(165,180,252,0.13);
+            position: relative;
+            overflow: hidden;
+        }
+        .form-section::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 18px;
+            pointer-events: none;
+            box-shadow: 0 0 32px 4px rgba(165,180,252,0.06);
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #6366f1;
+            margin-bottom: 10px;
+            letter-spacing: 0.01em;
+            display: block;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="file"],
+        .form-group select,
+        .form-group textarea {
+            border-radius: 10px;
+            border: 1.5px solid #c7d2fe;
+            padding: 12px 18px;
+            background: rgba(243,244,255,0.65);
+            color: #232946;
+            box-shadow: 0 2px 8px rgba(165,180,252,0.06);
+            font-size: 1.08em;
+            transition: border 0.3s, box-shadow 0.3s, background 0.3s;
+            width: 100%;
+            margin-bottom: 18px;
+        }
+        .form-group input[type="text"]:focus,
+        .form-group input[type="email"]:focus,
+        .form-group input[type="password"]:focus,
+        .form-group input[type="file"]:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.13);
+            background: rgba(243,244,255,0.92);
+            outline: none;
+        }
+        .btn-primary, .btn-secondary {
+            background: linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 32px;
+            font-size: .8em;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            box-shadow: 0 2px 16px 0 rgba(165,180,252,0.13);
+            transition: background 0.3s, box-shadow 0.3s, transform 0.18s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover, .btn-secondary:hover {
+            background: linear-gradient(90deg, #a5b4fc 0%, #6366f1 100%);
+            color: #fff;
+            box-shadow: 0 6px 24px 0 rgba(165,180,252,0.18);
+            transform: translateY(-2px) scale(1.04);
+        }
+        .btn-primary:active, .btn-secondary:active {
+            transform: scale(0.98);
+        }
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .settings-container {
+                padding: 12px 2vw 18px 2vw;
+            }
+            .form-section {
+                padding: 18px 8px 16px 8px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container settings-container">
+        
+
+        <div class="settings-section">
+            <h2>Account Settings</h2>
+            <div class="form-section">
+                <!-- Profile Image Form -->
+                <form method="post" enctype="multipart/form-data" style="margin-bottom: 24px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="profile_image">
+                    <div class="form-group" style="text-align:center;">
+                        {% if user_profile and user_profile.profile_image_url %}
+                            <img src="{{ user_profile.profile_image_url }}" alt="Profile Image" style="width:80px;height:80px;border-radius:50%;border:2px solid #a5b4fc;object-fit:cover;">
+                        {% else %}
+                            <span style="font-size:3rem;display:inline-block;line-height:80px;width:80px;height:80px;text-align:center;background:#f3f4f6;border-radius:50%;border:2px solid #a5b4fc;">🧑</span>
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
+                        <label for="profile_image">Profile Image</label>
+                        <input type="file" id="profile_image" name="profile_image" accept="image/*">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Profile Image</button>
+                </form>
+                <!-- Username Form -->
+                <form method="post" style="margin-bottom: 24px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="username">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" value="{{ user_profile.first_name }}{% if user_profile.last_name %} {{ user_profile.last_name }}{% endif %}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Username</button>
+                </form>
+                <!-- Email Form -->
+                <form method="post" style="margin-bottom: 24px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="email">
+                    <div class="form-group">
+                        <label for="email-settings">Email</label>
+                        <input type="email" id="email-settings" name="email-settings" value="{{ user_profile.email }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Email</button>
+                </form>
+                <!-- Change Password Form -->
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="password">
+                    <div class="form-group">
+                        <label for="password-settings">Change Password</label>
+                        <input type="password" id="password-settings" name="password-settings" placeholder="Enter new password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Password</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Notification Preferences</h2>
+            <div class="form-section">
+                <form>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="email-notifications" checked> Email Notifications
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="push-notifications"> Push Notifications
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Preferences</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Send Feedback</h2>
+            <div class="form-section">
+                <form>
+                    <div class="form-group">
+                        <label for="feedback-type">Category</label>
+                        <select id="feedback-type" name="feedback-type">
+                            <option value="bug">Bug Report</option>
+                            <option value="feature">Feature Request</option>
+                            <option value="general">General Feedback</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedback-message">Message</label>
+                        <textarea id="feedback-message" name="feedback-message" rows="5"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Submit Feedback</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %} 

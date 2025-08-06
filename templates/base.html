@@ -1,0 +1,121 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Learn Platform{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="navbar glass-navbar">
+        <div class="container">
+            <a href="{% url 'dashboard' %}" class="logo">AI Learn</a>
+            <div class="hamburger-menu" aria-label="Open navigation" tabindex="0">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+            <nav>
+                <ul class="navbar-links">
+                    <li><a href="{% url 'dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="{% url 'lesson' %}"><i class="fas fa-book-open"></i> Lessons</a></li>
+                    <li><a href="{% url 'quiz' %}"><i class="fas fa-question-circle"></i> Quiz</a></li>
+                    <li><a href="{% url 'syllabus' %}"><i class="fas fa-list-alt"></i> Syllabus</a></li>
+                    <li><a href="{% url 'notes' %}"><i class="fas fa-sticky-note"></i> Notes</a></li>
+                    <li><a href="{% url 'settings_feedback' %}"><i class="fas fa-cog"></i> Settings</a></li>
+                </ul>
+            </nav>
+            <div class="navbar-auth-buttons">
+                <div class="user-avatar-dropdown">
+                    {% if user_profile and user_profile.profile_image_url %}
+                        <img src="{{ user_profile.profile_image_url }}" alt="User Avatar" class="user-avatar">
+                    {% else %}
+                        <span class="user-avatar user-emoji-avatar" style="font-size:2rem;display:inline-block;line-height:40px;width:40px;height:40px;text-align:center;background:#f3f4f6;border-radius:50%;border:2px solid #a5b4fc;">🧑</span>
+                    {% endif %}
+                    <div class="dropdown-content">
+                        {% if request.session.firebase_user.first_name %}
+                            <div class="user-info">
+                                <strong>{{ request.session.firebase_user.first_name }} {{ request.session.firebase_user.last_name }}</strong>
+                            </div>
+                        {% endif %}
+                        <a href="#"><i class="fas fa-user"></i> Profile</a>
+                        <a href="{% url 'settings_feedback' %}"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <main>
+        {% block content %}
+        <!-- Page specific content will go here -->
+        {% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <ul class="footer-links">
+                <p>&copy; AI Learn. All rights reserved.</p>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        // Sticky Navbar
+        const navbar = document.querySelector('.navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Mobile Hamburger Menu Toggle
+        const hamburger = document.querySelector('.hamburger-menu');
+        const nav = document.querySelector('.navbar');
+
+        hamburger.addEventListener('click', () => {
+            nav.classList.toggle('active');
+        });
+
+        // User Avatar Dropdown Toggle
+        const userAvatarDropdown = document.querySelector('.user-avatar-dropdown');
+        if (userAvatarDropdown) {
+            userAvatarDropdown.addEventListener('click', function(event) {
+                event.stopPropagation();
+                this.querySelector('.dropdown-content').classList.toggle('show');
+            });
+
+            window.addEventListener('click', function(event) {
+                if (!event.target.matches('.user-avatar') && !event.target.closest('.user-avatar-dropdown')) {
+                    const dropdowns = document.querySelectorAll('.dropdown-content');
+                    dropdowns.forEach(dropdown => {
+                        if (dropdown.classList.contains('show')) {
+                            dropdown.classList.remove('show');
+                        }
+                    });
+                }
+            });
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

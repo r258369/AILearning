@@ -1,0 +1,694 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Study Notes{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --text-dark: #111827;
+        --text-light: #6b7280;
+        --background-light: #f9fafb;
+        --card-bg: #ffffff;
+        --border-color: #e5e7eb;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--background-light);
+        color: var(--text-dark);
+    }
+
+    .container {
+        max-width: 1100px;
+        margin: auto;
+        padding: 40px 20px;
+    }
+
+    .notes-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .notes-header h1 {
+        font-size: 2.5em;
+        color: var(--primary-color);
+    }
+
+    .notes-header p {
+        font-size: 1.1em;
+        color: var(--text-light);
+    }
+
+    #generateNotesBtn {
+        margin-top: 25px;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        background-color: var(--primary-color);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-left: auto;
+        margin-right: auto;
+        background: var(--gradient-primary); /* Apply gradient */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    #generateNotesBtn:hover {
+        opacity: 0.9;
+    }
+
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 18px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 600;
+        z-index: 999;
+        display: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .notification.success { background-color: #16a34a; }
+    .notification.error { background-color: #dc2626; }
+
+    /* Enhanced Dropdown Styles */
+    .dropdown {
+        background: rgb(255, 255, 255);
+        backdrop-filter: blur(20px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        min-height: 70px;
+        overflow: hidden;
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        margin: 20px auto; /* Centered with vertical margin */
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .dropdown:hover {
+        transform: translateY(-5px) scale(1.005); /* Slightly less scale */
+        box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .dropdown input:where(:checked) ~ .list {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-top: 0;
+        padding-top: 20px;
+        margin-bottom: 20px;
+        max-height: 400px;
+    }
+
+    .dropdown input:where(:not(:checked)) ~ .list {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+        max-height: 0;
+        margin-top: 0;
+        padding-top: 0;
+        margin-bottom: 0;
+        user-select: none;
+        pointer-events: none;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+    }
+
+    .trigger {
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        font-weight: 600;
+        color: white;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 24px 28px;
+        height: max-content;
+        position: relative;
+        z-index: 99;
+        border-radius: inherit;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+        font-size: 1.2rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .trigger:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.01); /* Slightly less scale on hover */
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+    }
+
+    .dropdown input:where(:checked) + .trigger {
+        margin-bottom: 0;
+        border-radius: 20px 20px 0 0;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(15px);
+    }
+
+    .dropdown input:where(:checked) + .trigger:before {
+        transform: rotate(90deg);
+        transition-delay: 0ms;
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .trigger:before {
+        content: "▶";
+        transform: rotate(-90deg);
+        width: 24px;
+        height: 24px;
+        color: white;
+        border-radius: 50%;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        order: 2;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .course-name-display {
+        flex-grow: 1;
+        text-align: left;
+        font-size: 1.3rem;
+        font-weight: 700;
+        order: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: black;
+        letter-spacing: 0.5px;
+    }
+
+    .course-name-display::before {
+        content: "📚";
+        font-size: 1.8rem;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
+
+    .list {
+        height: 100%;
+        width: 100%;
+        display: grid;
+        grid-auto-flow: row;
+        gap: 12px;
+        padding: 0 20px 20px 20px;
+        --w-scrollbar: 8px;
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+    }
+
+    .listitem {
+        list-style: none;
+        width: 100%;
+    }
+
+    .article {
+        padding: 15px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        width: 600px; /* Default width */
+        /* Decreased max-width */
+        border-color: rgba(148, 163, 231, 0.3);
+        background: rgb(245, 245, 245);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        margin: 0 auto; /* Center the cards within the list item */
+    }
+
+    .article::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+        
+    }
+
+    .article:hover::before {
+        transform: scaleX(1);
+    }
+
+    .article:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        border-color: rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 1);
+    }
+
+    .article h3 {
+        margin-bottom: 8px;
+        color: var(--text-dark);
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .article p {
+        color: var(--text-light);
+        margin-bottom: 16px;
+        line-height: 1.5;
+        font-size: 0.95rem;
+    }
+
+    .note-actions {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap; /* Allow buttons to wrap */
+        justify-content: center; /* Center buttons */
+    }
+
+    .btn-view, .btn-download {
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #0fbe77 0%, #0c9c64 100%); /* Green gradient */
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-view:hover, .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-view i, .btn-download i {
+        font-size: 1.1em;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-color);
+        max-width: 600px; /* Max width for empty state card */
+        margin: 40px auto; /* Center empty state card */
+    }
+
+    .empty-state h3 {
+        margin-bottom: 10px;
+        color: var(--text-dark);
+    }
+
+    .empty-state p {
+        color: var(--text-light);
+    }
+
+    /* Custom Scrollbar */
+    .webkit-scrollbar::-webkit-scrollbar {
+        width: var(--w-scrollbar);
+        height: var(--w-scrollbar);
+        border-radius: 9999px;
+    }
+
+    .webkit-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+    }
+
+    .webkit-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 9999px;
+        transition: background 0.3s ease;
+    }
+
+    .webkit-scrollbar:hover::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from { 
+            opacity: 0; 
+            transform: translateY(30px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+
+    @keyframes slideInUp {
+        from { 
+            opacity: 0; 
+            transform: translateY(30px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+
+    @keyframes fadeInItem {
+        from { 
+            opacity: 0; 
+            transform: translateY(10px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .container {
+            padding: 30px 16px;
+        }
+
+        .notes-header h1 {
+            font-size: 2.2em;
+        }
+
+        .dropdown {
+            margin: 15px auto;
+        }
+
+        .trigger {
+            padding: 20px;
+        }
+
+        .list {
+            padding: 0 16px 16px 16px;
+        }
+
+        .article {
+            padding: 16px;
+            max-width: 100%; /* Full width on small screens */
+        }
+
+        .note-actions {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn-view, .btn-download {
+            text-align: center;
+            justify-content: center;
+        }
+
+        .notification {
+            right: 16px;
+            left: 16px;
+            top: 20px;
+        }
+    }
+
+    /* Loading animation */
+    .loading-dots {
+        display: inline-block;
+        position: relative;
+        width: 20px;
+        height: 20px;
+    }
+
+    .loading-dots div {
+        position: absolute;
+        top: 8px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+        animation-timing-function: cubic-bezier(0, 1, 1, 0);
+    }
+
+    .loading-dots div:nth-child(1) {
+        left: 2px;
+        animation: loading1 0.6s infinite;
+    }
+
+    .loading-dots div:nth-child(2) {
+        left: 2px;
+        animation: loading2 0.6s infinite;
+    }
+
+    .loading-dots div:nth-child(3) {
+        left: 8px;
+        animation: loading2 0.6s infinite;
+    }
+
+    .loading-dots div:nth-child(4) {
+        left: 14px;
+        animation: loading3 0.6s infinite;
+    }
+
+    @keyframes loading1 {
+        0% { transform: scale(0); }
+        100% { transform: scale(1); }
+    }
+
+    @keyframes loading3 {
+        0% { transform: scale(1); }
+        100% { transform: scale(0); }
+    }
+
+    @keyframes loading2 {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(6px, 0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="notes-header">
+        <h1>Study Notes</h1>
+        <p>Access your personalized study materials and downloadable PDFs.</p>
+        <button id="generateNotesBtn">
+            <i class="fas fa-plus-circle"></i> Generate Study Notes
+        </button>
+        {% csrf_token %}
+        <div id="notification" class="notification"></div>
+    </div>
+
+    {% if notes_pdfs %}
+    <div id="notes-accordion-container">
+        {% for course_name, notes_list in notes_pdfs.items %}
+        <div class="dropdown">
+            <input
+              hidden=""
+              class="sr-only"
+              name="state-dropdown-{{ forloop.counter }}"
+              id="state-dropdown-{{ forloop.counter }}"
+              type="checkbox"
+            />
+            <label
+              aria-label="dropdown scrollbar"
+              for="state-dropdown-{{ forloop.counter }}"
+              class="trigger"
+            >
+                <span class="course-name-display">{{ course_name }} Notes</span>
+            </label>
+
+            <ul class="list webkit-scrollbar" role="list" dir="auto">
+                {% for note in notes_list %}
+                <li class="listitem" role="listitem">
+                    <article class="article">
+                        <h3>{{ note.topic }}</h3>
+                        <p>Complete study material including notes, quiz, and assignments.</p>
+                        <div class="note-actions">
+                            <a href="{{ note.pdf_url }}" target="_blank" class="btn-view">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            <a href="{{ note.pdf_url }}" download class="btn-download">
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                        </div>
+                    </article>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No Notes Available</h3>
+        <p>Complete the onboarding quiz to generate personalized materials.</p>
+        <a href="{% url 'onboarding_quiz' %}" class="btn-view">
+            <i class="fas fa-play-circle"></i> Start Quiz
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const generateBtn = document.getElementById('generateNotesBtn');
+        const notification = document.getElementById('notification');
+
+        function showNotification(message, type) {
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            setTimeout(() => notification.style.display = 'none', 4000);
+        }
+
+        if (generateBtn) {
+            generateBtn.addEventListener('click', function() {
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = `
+                    <div class="loading-dots">
+                        <div></div><div></div><div></div><div></div>
+                    </div>
+                    Generating...
+                `;
+                
+                fetch('{% url "generate_study_notes" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        generateBtn.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+                        generateBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                        
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showNotification(data.error, 'error');
+                        resetGenerateButton();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('An error occurred while generating notes.', 'error');
+                    resetGenerateButton();
+                });
+            });
+        }
+        
+        function resetGenerateButton() {
+            generateBtn.innerHTML = '<i class="fas fa-plus-circle"></i> Generate Study Notes';
+            generateBtn.disabled = false;
+            generateBtn.style.background = 'var(--gradient-primary)';
+        }
+        
+        // Add ripple effect to buttons
+        document.querySelectorAll('.btn-view, .btn-download, #generateNotesBtn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                const ripple = document.createElement('span');
+                const rect = this.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const x = e.clientX - rect.left - size / 2;
+                const y = e.clientY - rect.top - size / 2;
+                
+                ripple.style.width = ripple.style.height = size + 'px';
+                ripple.style.left = x + 'px';
+                ripple.style.top = y + 'px';
+                ripple.classList.add('ripple');
+                
+                this.appendChild(ripple);
+                
+                setTimeout(() => {
+                    ripple.remove();
+                }, 600);
+            });
+        });
+        
+        // Enhanced dropdown interactions
+        document.querySelectorAll('.dropdown input[type="checkbox"]').forEach((checkbox, index) => {
+            checkbox.addEventListener('change', function() {
+                const list = this.parentElement.querySelector('.list');
+                const items = list.querySelectorAll('.listitem');
+                
+                if (this.checked) {
+                    // Add staggered animation when opening
+                    items.forEach((item, i) => {
+                        item.style.animationDelay = (i * 0.1) + 's';
+                        item.style.animation = 'none';
+                        setTimeout(() => {
+                            item.style.animation = 'fadeInItem 0.4s ease-out forwards';
+                        }, 10);
+                    });
+                }
+            });
+        });
+    });
+    
+    // Add CSS for ripple effect
+    const style = document.createElement('style');
+    style.textContent = `
+    .ripple {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(0);
+        animation: ripple-animation 0.6s linear;
+        pointer-events: none;
+    }
+    
+    @keyframes ripple-animation {
+        to {
+            transform: scale(4);
+            opacity: 0;
+        }
+    }
+    `;
+    document.head.appendChild(style);
+</script>
+{% endblock %}

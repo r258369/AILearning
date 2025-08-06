@@ -1,0 +1,189 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Learning</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+</head>
+<body>
+    <header class="navbar">
+        <div class="container">
+            <a href="{% url 'landing' %}" class="logo">AI Learn</a>
+            <div class="hamburger-menu">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+            <nav>
+                <ul class="navbar-links">
+                    <li><a href="#features-section">Features</a></li>
+                    <li><a href="#pricing-section">Pricing</a></li>
+                    <li><a href="#about-section">About</a></li>
+                    <li><a href="#contact-section">Contact</a></li>
+                </ul>
+            </nav>
+            <div class="navbar-auth-buttons">
+                <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
+                <a href="{% url 'signup' %}" class="btn btn-primary">Sign Up</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero-section">
+        <div class="container hero-container">
+          <div class="hero-image-container">
+            <img src="{% static 'images/hero_illustration.png' %}" alt="AI-powered learning illustration">
+          </div>
+          <div class="hero-content">
+            <h1 class="gradient-text">Your Personalized AI Learning Journey Starts Here</h1>
+            <h3 class="hero-subheading">Smarter, faster, and more fun learning powered by AI</h3>
+            <p>Discover customized courses, interactive lessons, and track your skills with the power of AI.</p>
+            <div class="hero-cta-buttons">
+              <a href="{% url 'signup' %}" class="btn btn-primary">Get Started for Free</a>
+              <a href="#features-section" class="btn btn-outline">Learn More</a>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      
+
+    <section id="features-section" class="features-section">
+        <div class="container">
+            <h2>Key Features</h2>
+            <div class="feature-cards-grid">
+                <div class="card feature-card">
+                    <i class="icon fas fa-brain"></i>
+                    <h3>Adaptive Learning</h3>
+                    <p>AI-driven personalized paths that adjust to your pace and style.</p>
+                </div>
+                <div class="card feature-card">
+                    <i class="icon fas fa-chart-line"></i>
+                    <h3>Progress Tracking</h3>
+                    <p>Monitor your growth with detailed analytics and skill insights.</p>
+                </div>
+                <div class="card feature-card">
+                    <i class="icon fas fa-video"></i>
+                    <h3>Interactive Lessons</h3>
+                    <p>Engaging video content and AI-generated summaries for quick revision.</p>
+                </div>
+                
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonials-section">
+        <div class="container">
+            <h2>Trusted by thousands of learners</h2>
+            <div class="testimonial-cards-grid">
+                <div class="card testimonial-card">
+                    <img src="{% static 'images/avatar_1.png' %}" alt="Student Avatar" class="avatar">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                    <p>"AI Learn transformed my study habits! The personalized lessons are incredibly effective."</p>
+                    <p class="author">- Alex R., University Student</p>
+                </div>
+                <div class="card testimonial-card">
+                    <img src="{% static 'images/avatar_2.png' %}" alt="Student Avatar" class="avatar">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                    <p>"I love how the AI adapts to my needs. It's like having a personal tutor 24/7!"</p>
+                    <p class="author">- Jamie L., High School Learner</p>
+                </div>
+                <div class="card testimonial-card">
+                    <img src="{% static 'images/avatar_3.png' %}" alt="Student Avatar" class="avatar">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                    <p>"The best platform for learning new skills. Highly recommend to anyone serious about education."</p>
+                    <p class="author">- Chris P., Career Changer</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-bottom-section">
+        <div class="container">
+            <h2>Ready to start your journey?</h2>
+            <a href="{% url 'signup' %}" class="btn btn-primary">Sign Up Now</a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <ul class="footer-links">
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Terms of Service</a></li>
+                <li><a href="#">FAQ</a></li>
+                <li><a href="#">Support</a></li>
+            </ul>
+            <div class="social-icons">
+                <a href="#"><i class="fab fa-facebook-f"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+            </div>
+            <p>&copy; 2024 AI Learn. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Sticky Navbar
+        const navbar = document.querySelector('.navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) { // Adjust scroll threshold as needed
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Mobile Hamburger Menu Toggle
+        const hamburger = document.querySelector('.hamburger-menu');
+        const nav = document.querySelector('.navbar');
+
+        hamburger.addEventListener('click', () => {
+            nav.classList.toggle('active');
+        });
+
+        // Subtle fade-in animations on scroll (Intersection Observer API)
+        const faders = document.querySelectorAll('.hero-content, .hero-image-container, .feature-card, .testimonial-card, .cta-bottom-section h2, .cta-bottom-section .btn');
+
+        const appearOptions = {
+            threshold: 0.1,
+            rootMargin: "0px 0px -100px 0px"
+        };
+
+        const appearOnScroll = new IntersectionObserver(function(entries, appearOnScroll) {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) {
+                    return;
+                } else {
+                    entry.target.style.opacity = 1;
+                    entry.target.style.transform = 'translateY(0)';
+                    appearOnScroll.unobserve(entry.target);
+                }
+            });
+        }, appearOptions);
+
+        faders.forEach(fader => {
+            fader.style.opacity = 0;
+            fader.style.transform = 'translateY(20px)';
+            fader.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            appearOnScroll.observe(fader);
+        });
+
+    </script>
+</body>
+</html>

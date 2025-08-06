@@ -1,0 +1,217 @@
+/* General styles */
+body {
+    background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%) !important;
+    min-height: 100vh;
+    font-family: 'Poppins', 'Inter', 'Roboto', sans-serif;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Color Palette */
+:root {
+    --primary-blue: #2563EB;
+    --secondary-indigo: #4F46E5;
+    --background-white: #FFFFFF;
+    --soft-gray-accent: #F3F4F6;
+    --subtle-divider-gray: #E5E7EB;
+    --text-color: #111827;
+    --light-gray: #ecf0f1; /* Keeping this for general form elements, but new ones are more specific */
+    --error-red: #dc3545;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+h1 {
+    font-size: 2.5em;
+}
+
+h2 {
+    font-size: 2em;
+}
+
+p {
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 12px 25px; /* Slightly larger padding */
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease; /* Smooth transition for hover, focus */
+    cursor: pointer;
+    border: none;
+    font-size: 1em;
+}
+
+.btn-primary {
+    background-color: var(--primary-blue);
+    color: var(--background-white);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+    background-color: #1a4ed8; /* Slightly darker blue on hover */
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Growing shadow */
+}
+
+.btn-secondary {
+    background-color: var(--secondary-indigo);
+    color: var(--background-white);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:hover {
+    background-color: #3d35c7; /* Slightly darker indigo on hover */
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Growing shadow */
+}
+
+.btn-outline {
+    background-color: transparent;
+    color: var(--primary-blue);
+    border: 2px solid var(--primary-blue);
+    box-shadow: none;
+}
+
+.btn-outline:hover {
+    background-color: var(--primary-blue);
+    color: var(--background-white);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Cards */
+.card {
+    background-color: var(--background-white);
+    border-radius: 8px; /* Adjusted to 8px */
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.08); /* Slightly softer shadow */
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: box-shadow 0.3s ease; /* For form focus effect */
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--subtle-divider-gray); /* Use new gray for borders */
+    border-radius: 8px; /* Adjusted to 8px */
+    box-sizing: border-box;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03); /* Softer subtle shadow */
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="password"]:focus,
+.form-group textarea:focus {
+    border-color: var(--primary-blue);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Growing shadow on focus */
+    outline: none;
+}
+
+.inline-error {
+    color: var(--error-red);
+    font-size: 0.85em;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Responsive design basic setup (adjusted for mobile-first) */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+}
+
+/* Messages */
+.messages-container {
+    margin-top: 20px;
+    padding: 0 20px; /* Align with container padding */
+}
+
+.alert {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.alert.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.alert.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+.alert.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeeba;
+}
+
+.alert.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.alert ul {
+    margin-bottom: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.alert li {
+    margin-bottom: 5px;
+}
+
+.alert li:last-child {
+    margin-bottom: 0;
+}
+
+/* User dropdown styles */
+.user-info {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--subtle-divider-gray);
+    margin-bottom: 5px;
+    text-align: center;
+    color: var(--text-color);
+    font-size: 0.9em;
+}
+
+.user-info strong {
+    color: var(--primary-blue);
+} 

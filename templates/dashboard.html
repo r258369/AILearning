@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+    
+{% block extra_css %}
+    <style>
+        
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="greeting">
+                <h1>Hello, {% if user_profile.first_name %}{{ user_profile.first_name }}{% else %}there{% endif %}!</h1>
+                <p>Welcome back to your personalized learning journey.</p>
+            </div>
+            <div class="profile-card">
+                
+                <div class="profile-info">
+                    <div class="info-card"><span class="info-icon"><i class="fas fa-brain"></i></span>Learning style: <strong>{{ user_profile.learning_style|default:"N/A" }}</strong></div>
+                    <div class="info-card"><span class="info-icon"><i class="fas fa-book"></i></span>Subjects: <strong>{{ user_profile.preferred_subjects|default:"N/A" }}</strong></div>
+                    <div class="info-card"><span class="info-icon"><i class="fas fa-signal"></i></span>Skill level: <strong>{{ user_profile.skill_level|default:"N/A" }}</strong></div>
+                    <div class="info-card"><span class="info-icon"><i class="fas fa-bullseye"></i></span>Goal: <strong>{{ user_profile.specific_goals|default:"N/A" }}</strong></div>
+                    <a href="{% url 'onboarding_quiz' %}" class="cta-btn">Create/Update Course</a>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <div class="dashboard-sections">
+            <div class="main-content" style="width:100%;">
+                <!-- Progress Report Content Start -->
+                <div class="report-container">
+                    <h1>Your Learning Progress Report</h1>
+
+                    <div class="report-section">
+                        <h2>Course Progress Overview</h2>
+                        <table class="progress-table">
+                            <thead>
+                                <tr>
+                                    <th>Course Name</th>
+                                    <th>Progress</th>
+                                    <th>Last Activity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if courses_progress %}
+                                    {% for course in courses_progress %}
+                                <tr>
+                                        <td>{{ course.coursename }}</td>
+                                        <td>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" style="width: {{ course.progress }}%">
+                                                </div>
+                                                <span class="progress-text">{{ course.progress|floatformat:1 }}%</span>
+                                            </div>
+
+                                        </td>
+                                        <td>{{ course.last_activity|slice:":10" }}</td>
+                                        <td>
+                                            <span class="status-badge status-{{ course.status|lower|cut:' ' }}">
+                                                {{ course.status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4">No course progress data available. Start watching videos to track your progress!</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="report-section">
+                        <h2>Badges and Achievements</h2>
+                        <div class="badge-grid">
+                            {% for badge_name in badges %}
+                            <div class="badge-item">
+                                <img src="{% static 'images/badge_master.png' %}" alt="{{ badge_name }} Badge">
+                                <p>{{ badge_name }}</p>
+                            </div>
+                            {% empty %}
+                            <p>No badges earned yet.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h2><span class="icon"><i class="fas fa-chart-bar"></i></span>Quiz Results History</h2>
+                        <div class="quiz-charts-flex">
+                          <div style="max-width: 500px; min-width: 300px; flex: 1;">
+                            <canvas id="quizResultsChart"></canvas>
+                          </div>
+                          <div class="divider"></div>
+                          <div style="max-width: 300px; min-width: 220px; flex: 0 1 300px;">
+                            <canvas id="quizPieChart"></canvas>
+                          </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Progress Report Content End -->
+
+                
+
+                <div class="recent-activity-section" style="margin-top: 30px;">
+                    <h2>Last Activity</h2>
+                    <div class="recent-activity-list">
+                        {% if user_profile.last_lesson_completed %}
+                        <div class="recent-activity-item">
+                            <span class="activity-icon"><i class="fas fa-book-open"></i></span>
+                            <div class="activity-details">
+                                <p class="title">Completed Lesson: {{ user_profile.last_lesson_completed }}</p>
+                                <p class="time">Just now</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if user_profile.last_quiz_taken %}
+                        <div class="recent-activity-item">
+                            <span class="activity-icon"><i class="fas fa-question-circle"></i></span>
+                            <div class="activity-details">
+                                <p class="title">Quiz Taken: {{ user_profile.last_quiz_taken }}</p>
+                                <p class="time">Just now</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if not user_profile.last_lesson_completed and not user_profile.last_quiz_taken %}
+                        <p>No recent activities.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      const quizData = {{ quiz_results_history|safe }};
+      // Format timestamp as date string for labels
+      function formatDate(ts) {
+        if (!ts) return '';
+        // Try to parse as ISO string or fallback
+        const d = new Date(ts);
+        if (!isNaN(d)) {
+          return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        return ts;
+      }
+      const labels = quizData.map(q => formatDate(q.timestamp));
+      const correct = quizData.map(q => q.correct);
+      const incorrect = quizData.map(q => q.incorrect);
+
+      // Bar chart (existing)
+      const data = {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Correct',
+            data: correct,
+            borderRadius: 8,
+            barThickness: 30
+          },
+          {
+            label: 'Incorrect',
+            data: incorrect,
+            borderRadius: 8,
+            barThickness: 30,
+          }
+        ]
+      };
+
+      const config = {
+        type: 'bar',
+        data: data,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'top' },
+            title: {
+              display: true,
+              text: 'Last 7 Quiz Results'
+            }
+          },
+          scales: {
+            x: { stacked: true },
+            y: { beginAtZero: true, stacked: true }
+          },
+          elements: {
+            bar: {
+              borderWidth: 2,
+              borderRadius: 8,
+              hoverBorderWidth: 3,
+              hoverBorderColor: '#fff',
+              transition: 'all 0.3s ease',
+              backgroundColor: function(context) {
+                const color = context.dataset.label === 'Correct' ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+                return color;
+              },
+              hoverBackgroundColor: function(context) {
+                const color = context.dataset.label === 'Correct' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+                return color;
+              }
+            }
+          },
+          animation: {
+            duration: 300,
+            easing: 'easeInOutQuart'
+          },
+          hover: {
+            animationDuration: 300,
+            mode: 'nearest',
+            intersect: true
+          }
+        }
+      };
+
+      new Chart(document.getElementById('quizResultsChart'), config);
+
+      // Pie chart for total correct/incorrect and average percent
+      const totalCorrect = correct.reduce((a, b) => a + b, 0);
+      const totalIncorrect = incorrect.reduce((a, b) => a + b, 0);
+      const total = totalCorrect + totalIncorrect;
+      const avgCorrect = total ? Math.round((totalCorrect / total) * 100) : 0;
+      const avgIncorrect = total ? Math.round((totalIncorrect / total) * 100) : 0;
+
+      const pieData = {
+        labels: [
+          `Correct (${avgCorrect}%)`,
+          `Incorrect (${avgIncorrect}%)`
+        ],
+        datasets: [{
+          data: [totalCorrect, totalIncorrect],
+          backgroundColor: [
+            'rgba(7, 145, 58, 0.8)', // green
+            'rgba(138, 5, 5, 0.8)'  // red
+          ],
+          borderWidth: 2
+        }]
+      };
+
+      const pieConfig = {
+        type: 'pie',
+        data: pieData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            title: {
+              display: true,
+              text: 'Correct vs Incorrect (All Quizzes)'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed;
+                  return `${label}: ${value}`;
+                }
+              }
+            }
+          },
+          elements: {
+            arc: {
+              borderWidth: 2,
+              hoverOffset: 15,
+              hoverBorderWidth: 3,
+              transition: 'all 0.3s ease',
+              hoverBorderColor: '#fff',
+              borderColor: '#fff'
+            }
+          },
+          animation: {
+            animateRotate: true,
+            animateScale: true
+          }
+        }
+      };
+
+      const pieChart = new Chart(document.getElementById('quizPieChart'), pieConfig);
+    </script>
+{% endblock %}
