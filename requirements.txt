@@ -6,3 +6,9 @@ beautifulsoup4>=4.9.0
 requests>=2.25.0
 wikipedia>=1.4.0
 reportlab>=3.6.0 
+gunicorn
+psycopg2-binary
+django-crispy-forms
+crispy-bootstrap5
+python-dotenv
+requests
