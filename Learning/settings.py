@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-ddg-&&0d-6dxq_2myq=u_a9yc1t7$i_ji%3@*u(t8tyisec#v$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # Added for Google Classroom OAuth debugging
 SESSION_COOKIE_SAMESITE = 'None'
