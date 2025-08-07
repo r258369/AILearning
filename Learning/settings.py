@@ -33,10 +33,7 @@ ALLOWED_HOSTS = ['*']
 # Added for Google Classroom OAuth debugging
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',
-    'https://localhost:8000',
-]
+
 
 
 # Application definition
