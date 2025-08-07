@@ -1,6 +1,7 @@
+import firebase_admin
+from firebase_admin import credentials, firestore
 import os
 import json
-from firebase_admin import credentials
 
 # Read the JSON string from environment variable
 firebase_creds_json = os.environ.get("FIREBASE_ADMIN_CREDENTIALS")  # use your actual env var name here
