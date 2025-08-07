@@ -11,3 +11,8 @@ if not firebase_creds_json:
 cred_dict = json.loads(firebase_creds_json)  # parse JSON string to dict
 
 cred = credentials.Certificate(cred_dict)
+# Initialize app if not already initialized
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
