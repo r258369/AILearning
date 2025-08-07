@@ -1,12 +1,13 @@
-# firebase_config.py
-import firebase_admin
-from firebase_admin import credentials, firestore
+import os
+import json
+from firebase_admin import credentials
 
-cred = credentials.Certificate("FIREBASE_ADMIN_CREDENTIALS")
+# Read the JSON string from environment variable
+firebase_creds_json = os.environ.get("FIREBASE_ADMIN_CREDENTIALS_JSON")  # use your actual env var name here
 
-# Initialize Firebase with storage bucket configuration
-firebase_admin.initialize_app(cred, {
-    'storageBucket': 'elearning-8634a.appspot.com'
-})
+if not firebase_creds_json:
+    raise Exception("FIREBASE_ADMIN_CREDENTIALS_JSON environment variable not set.")
 
-db = firestore.client()
+cred_dict = json.loads(firebase_creds_json)  # parse JSON string to dict
+
+cred = credentials.Certificate(cred_dict)
