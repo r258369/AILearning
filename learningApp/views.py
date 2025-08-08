@@ -251,41 +251,115 @@ def generate_pdf_from_content(content_dict, topic, user_id):
         return None
 
 def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
-    if pdf_content_base64:
-        user_profile_ref = db.collection('user_profiles').document(user_id)
-        
-        user_doc = user_profile_ref.get()
-        user_data = user_doc.to_dict() if user_doc.exists else {}
-        
-        notes_pdfs = user_data.get('notes_pdfs', [])
-        
-        # Find if the course already exists
-        found_course = None
-        for course in notes_pdfs:
-            if course.get('coursename') == course_name:
-                found_course = course
-                break
-        
-        if found_course:
-            # Add note to existing course
-            if 'notes' not in found_course:
-                found_course['notes'] = []
-            found_course['notes'].append({'topic': topic, 'pdf_url': pdf_content_base64})
-        else:
-            # Create new course entry
-            new_course = {
-                'coursename': course_name,
-                'notes': [{'topic': topic, 'pdf_url': pdf_content_base64}]
-            }
-            notes_pdfs.append(new_course)
-        
-        user_profile_ref.set({
-            'notes_pdfs': notes_pdfs,
-            'last_updated': firestore.SERVER_TIMESTAMP
-        }, merge=True)
-        print(f"PDF content saved to Firestore for topic: {topic} under course: {course_name}")
-    else:
+    """
+    Save study notes using Firestore subcollections to avoid document size limits.
+    Structure: user_profiles/{user_id}/courses/{course_name}/notes/{topic}
+    """
+    if not pdf_content_base64:
         print(f"Failed to save PDF content for topic: {topic}")
+        return False
+    
+    try:
+        # Create a sanitized course name for use as document ID
+        sanitized_course_name = re.sub(r'[^a-zA-Z0-9_-]', '_', course_name.lower())
+        sanitized_topic = re.sub(r'[^a-zA-Z0-9_-]', '_', topic.lower())
+        
+        # Create the course document reference
+        course_ref = db.collection('user_profiles').document(user_id).collection('courses').document(sanitized_course_name)
+        
+        # Set course metadata (this document will be small)
+        course_ref.set({
+            'coursename': course_name,
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'note_count': firestore.Increment(1)
+        }, merge=True)
+        
+        # Create the note document in the course's notes subcollection
+        note_ref = course_ref.collection('notes').document(sanitized_topic)
+        
+        # Save the note with metadata
+        note_ref.set({
+            'topic': topic,
+            'pdf_content': pdf_content_base64,
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'file_size_bytes': len(pdf_content_base64.encode('utf-8'))
+        })
+        
+        print(f"PDF content saved to Firestore subcollection for topic: {topic} under course: {course_name}")
+        return True
+        
+    except Exception as e:
+        print(f"Error saving note to Firestore: {e}")
+        return False
+
+
+def get_notes_from_firestore(user_id):
+    """
+    Retrieve study notes from Firestore subcollections.
+    Returns organized notes by course name.
+    """
+    try:
+        organized_notes = {}
+        
+        # Get all courses for the user
+        courses_ref = db.collection('user_profiles').document(user_id).collection('courses')
+        courses = courses_ref.stream()
+        
+        for course_doc in courses:
+            course_data = course_doc.to_dict()
+            course_name = course_data.get('coursename', 'Untitled Course')
+            
+            # Get all notes for this course
+            notes_ref = course_doc.reference.collection('notes')
+            notes = notes_ref.stream()
+            
+            notes_list = []
+            for note_doc in notes:
+                note_data = note_doc.to_dict()
+                notes_list.append({
+                    'topic': note_data.get('topic', ''),
+                    'pdf_url': note_data.get('pdf_content', ''),
+                    'created_at': note_data.get('created_at'),
+                    'file_size_bytes': note_data.get('file_size_bytes', 0)
+                })
+            
+            # Sort notes by creation date (newest first)
+            notes_list.sort(key=lambda x: x['created_at'] if x['created_at'] else '', reverse=True)
+            organized_notes[course_name] = notes_list
+        
+        return organized_notes
+        
+    except Exception as e:
+        print(f"Error retrieving notes from Firestore: {e}")
+        return {}
+
+
+def delete_note_from_firestore(user_id, course_name, topic):
+    """
+    Delete a specific note from Firestore subcollections.
+    """
+    try:
+        sanitized_course_name = re.sub(r'[^a-zA-Z0-9_-]', '_', course_name.lower())
+        sanitized_topic = re.sub(r'[^a-zA-Z0-9_-]', '_', topic.lower())
+        
+        # Delete the note document
+        note_ref = db.collection('user_profiles').document(user_id).collection('courses').document(sanitized_course_name).collection('notes').document(sanitized_topic)
+        note_ref.delete()
+        
+        # Update course metadata
+        course_ref = db.collection('user_profiles').document(user_id).collection('courses').document(sanitized_course_name)
+        course_ref.update({
+            'note_count': firestore.Increment(-1),
+            'last_updated': firestore.SERVER_TIMESTAMP
+        })
+        
+        print(f"Note deleted: {topic} from course: {course_name}")
+        return True
+        
+    except Exception as e:
+        print(f"Error deleting note from Firestore: {e}")
+        return False
 
 
 def landing_view(request):
@@ -452,7 +526,6 @@ Please structure it as a clean, detailed **HTML syllabus layout** with:
 - Subheadings for topics (`<h3>`)
 - Bullet points for activities (`<ul>`, `<li>`)
 - Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
-- Make each section header colorfull and visually appealing with well structured.
 Important: Always keep the each day topics name undre <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **inside the body tag**, NOT the full HTML structure 
 (no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
 Just give me the **content portion** that I can embed directly into my existing Django template.
@@ -925,24 +998,17 @@ def quiz_view(request):
 def notes_view(request):
     user_profile = None
     firebase_uid = request.session.get('firebase_user', {}).get('uid')
-    notes_pdfs = []
-    course_title = "My Learning Course" # Default course title
+    notes_pdfs = {}
 
     if firebase_uid:
+        # Get user profile data
         doc_ref = db.collection('user_profiles').document(firebase_uid)
         doc = doc_ref.get()
         if doc.exists:
             user_profile = doc.to_dict()
-            notes_pdfs_raw = user_profile.get('notes_pdfs', [])
-            
-            # Organize notes by course name for display
-            organized_notes = {}
-            for course_entry in notes_pdfs_raw:
-                course_name = course_entry.get('coursename', 'Untitled Course')
-                notes_list = course_entry.get('notes', [])
-                organized_notes[course_name] = notes_list
-            
-            notes_pdfs = organized_notes # Pass the organized dictionary to the template
+        
+        # Get notes from subcollections using the new function
+        notes_pdfs = get_notes_from_firestore(firebase_uid)
 
     context = {
         'user_profile': user_profile,
@@ -1191,8 +1257,10 @@ def generate_study_notes(request):
                 
                 if pdf_content_base64:
                     # Step 4: Save PDF content to Firestore with the determined course name
-                    save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name)
-                    new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
+                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
+                        new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
+                    else:
+                        print(f"Failed to save PDF for topic: {topic}")
                 else:
                     print(f"Failed to generate PDF for topic: {topic}")
             else:
@@ -1208,5 +1276,106 @@ def generate_study_notes(request):
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
 
 
+def migrate_old_notes_to_subcollections(user_id):
+    """
+    Migrate existing notes from the old array structure to the new subcollection structure.
+    This function should be called once per user to migrate their existing data.
+    """
+    try:
+        user_profile_ref = db.collection('user_profiles').document(user_id)
+        user_doc = user_profile_ref.get()
+        
+        if not user_doc.exists:
+            print(f"User profile not found for {user_id}")
+            return False
+        
+        user_data = user_doc.to_dict()
+        old_notes_pdfs = user_data.get('notes_pdfs', [])
+        
+        if not old_notes_pdfs:
+            print(f"No old notes found for user {user_id}")
+            return True  # No old notes to migrate
+        
+        print(f"Found {len(old_notes_pdfs)} course entries to migrate for user {user_id}")
+        migrated_count = 0
+        failed_count = 0
+        
+        for course_entry in old_notes_pdfs:
+            course_name = course_entry.get('coursename', 'Untitled Course')
+            notes_list = course_entry.get('notes', [])
+            
+            print(f"Migrating course: {course_name} with {len(notes_list)} notes")
+            
+            for note in notes_list:
+                topic = note.get('topic', '')
+                pdf_url = note.get('pdf_url', '')
+                
+                if topic and pdf_url:
+                    # Save to new subcollection structure
+                    if save_note_to_firestore(user_id, topic, pdf_url, course_name):
+                        migrated_count += 1
+                        print(f"Successfully migrated note: {topic}")
+                    else:
+                        failed_count += 1
+                        print(f"Failed to migrate note: {topic}")
+                else:
+                    print(f"Skipping note with missing topic or pdf_url: {note}")
+        
+        # Only remove old notes_pdfs array if migration was successful
+        if migrated_count > 0:
+            user_profile_ref.update({
+                'notes_pdfs': firestore.DELETE_FIELD
+            })
+            print(f"Removed old notes_pdfs array from user profile")
+        
+        print(f"Migration completed for user {user_id}: {migrated_count} successful, {failed_count} failed")
+        return migrated_count > 0
+        
+    except Exception as e:
+        print(f"Error migrating notes for user {user_id}: {e}")
+        return False
 
 
+@login_required
+@require_POST
+def delete_study_note(request):
+    """Delete a specific study note from Firestore subcollections"""
+    firebase_uid = request.session.get('firebase_user', {}).get('uid')
+    if not firebase_uid:
+        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
+
+    try:
+        data = json.loads(request.body)
+        course_name = data.get('course_name')
+        topic = data.get('topic')
+        
+        if not course_name or not topic:
+            return JsonResponse({'success': False, 'error': 'Missing course_name or topic.'})
+        
+        if delete_note_from_firestore(firebase_uid, course_name, topic):
+            return JsonResponse({'success': True, 'message': f'Note "{topic}" deleted successfully!'})
+        else:
+            return JsonResponse({'success': False, 'error': 'Failed to delete note.'})
+            
+    except Exception as e:
+        print(f"Error deleting study note: {e}")
+        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+
+
+@login_required
+@require_POST
+def migrate_user_notes(request):
+    """Migrate user's existing notes from old structure to new subcollection structure"""
+    firebase_uid = request.session.get('firebase_user', {}).get('uid')
+    if not firebase_uid:
+        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
+
+    try:
+        if migrate_old_notes_to_subcollections(firebase_uid):
+            return JsonResponse({'success': True, 'message': 'Notes migrated successfully!'})
+        else:
+            return JsonResponse({'success': False, 'error': 'Failed to migrate notes.'})
+            
+    except Exception as e:
+        print(f"Error migrating user notes: {e}")
+        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
