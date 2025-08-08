@@ -668,6 +668,38 @@
                 }
             });
         });
+        
+        // Check if migration is needed and perform it automatically
+        function checkAndMigrateNotes() {
+            // Check if there are any notes in the old format by looking for the old structure
+            const hasOldNotes = {{ notes_pdfs|length }} === 0 && document.querySelector('.empty-state') === null;
+            
+            if (hasOldNotes) {
+                console.log('Detected old notes format, attempting migration...');
+                fetch('{% url "migrate_user_notes" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Migration successful, reloading page...');
+                        location.reload();
+                    } else {
+                        console.log('Migration failed or not needed:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Migration error:', error);
+                });
+            }
+        }
+        
+        // Run migration check on page load
+        checkAndMigrateNotes();
     });
     
     // Add CSS for ripple effect
