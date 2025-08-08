@@ -17,5 +17,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('mark-video-complete/', views.mark_video_complete, name='mark_video_complete'),
     path('generate-study-notes/', views.generate_study_notes, name='generate_study_notes'),
+    path('delete-study-note/', views.delete_study_note, name='delete_study_note'),
+    path('migrate-user-notes/', views.migrate_user_notes, name='migrate_user_notes'),
     #path('generate-syllabus/', views.generate_syllabus_view, name='generate-syllabus'),
 ]
