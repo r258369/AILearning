@@ -148,11 +148,13 @@ def generate_structured_content_with_gemini(topic, level, specific_goals):
     prompt = f'''
 Specific Goals: {specific_goals}
 Topic: {topic}\nLevel: {level}
-1. Research and write clear, concise study notes (400-500 words, student-friendly tone, with relevant examples like maths, codes, etc.) using your internal knowledge and web search capabilities to gather accurate and up-to-date information from reliable public sources (e.g., Wikipedia, OpenStax, Khan Academy, Byju's, etc.).
-2. Create a 5-question assignment (mix of MCQ, fill-in-the-blanks, and short answers) based on the notes. For MCQs, provide 4 options (a-d). For fill-in-the-blanks, indicate the blank with underscores. For short answers, ask questions that can be answered in 2-3 sentences.
-Format for PDF:
+Return your answer in EXACTLY two sections with these headings on their own lines:
 📝 Study Notes
 📄 Assignment Questions
+Rules:
+- Under 📝 Study Notes: write 400-500 words, student-friendly, include examples.
+- Under 📄 Assignment Questions: exactly 5 questions, mix MCQ/fill-in-the-blank/short answer. For MCQ include options a-d.
+- Do not include any other headings or sections. Do not add extra preface or epilogue text.
 '''
     try:
         print(f"Calling Gemini API for topic: {topic}")
@@ -173,23 +175,96 @@ Format for PDF:
         return ""
 
 def parse_gemini_content_to_sections(gemini_text):
-    # Simple parser to split the Gemini output into sections
-    notes, assignment = "", ""
-    lines = gemini_text.splitlines()
-    section = None
-    for line in lines:
-        l = line.strip()
-        if l.startswith("📝"):
-            section = "notes"
-            continue
-        elif l.startswith("📄"):
-            section = "assignment"
-            continue
-        if section == "notes":
-            notes += line + "\n"
-        elif section == "assignment":
-            assignment += line + "\n"
-    return {"notes": notes.strip(), "assignment": assignment.strip()}
+    """
+    Robustly split Gemini output into notes and assignment sections.
+    Handles emojis, markdown headings, plain text labels, and HTML.
+    Always returns non-empty strings when possible.
+    """
+    try:
+        text = gemini_text or ""
+        if not text.strip():
+            return {"notes": "", "assignment": ""}
+
+        # 1) If HTML contains obvious section headings, try BeautifulSoup first
+        if "<" in text and ">" in text:
+            soup = BeautifulSoup(text, 'html.parser')
+            # Find headings and map them
+            headings = soup.find_all(["h1", "h2", "h3", "strong", "b", "p"])  # ordered appearance
+            notes_chunks, assign_chunks = [], []
+            current = None
+            for tag in headings:
+                label = (tag.get_text(" ", strip=True) or "").lower()
+                if any(k in label for k in ["📝", "study notes", "notes"]):
+                    current = "notes"
+                    continue
+                if any(k in label for k in ["📄", "assignment", "questions"]):
+                    current = "assignment"
+                    continue
+                if current == "notes":
+                    notes_chunks.append(str(tag))
+                elif current == "assignment":
+                    assign_chunks.append(str(tag))
+            notes_html = "\n".join(notes_chunks).strip()
+            assign_html = "\n".join(assign_chunks).strip()
+            if notes_html or assign_html:
+                return {"notes": notes_html, "assignment": assign_html}
+
+        # 2) Regex-based split for text/markdown
+        import re as _re
+        patterns = {
+            "notes": _re.compile(r"(?:^|\n)\s*(?:📝\s*)?(?:study\s*notes|notes)\s*[:\-]*\s*(?:\n|$)", _re.I),
+            "assignment": _re.compile(r"(?:^|\n)\s*(?:📄\s*)?(?:assignment(?:\s*questions)?|questions)\s*[:\-]*\s*(?:\n|$)", _re.I)
+        }
+        notes_match = patterns["notes"].search(text)
+        assign_match = patterns["assignment"].search(text)
+        notes_str, assign_str = "", ""
+        if notes_match and assign_match:
+            if notes_match.start() < assign_match.start():
+                notes_str = text[notes_match.end():assign_match.start()] .strip()
+                assign_str = text[assign_match.end():] .strip()
+            else:
+                assign_str = text[assign_match.end():notes_match.start()] .strip()
+                notes_str = text[notes_match.end():] .strip()
+        elif notes_match:
+            notes_str = text[notes_match.end():].strip()
+        elif assign_match:
+            assign_str = text[assign_match.end():].strip()
+
+        # 3) Fallback: try markdown headings (##, ###)
+        if not notes_str and not assign_str:
+            # Find indices of markdown headings with keywords
+            md_notes = list(_re.finditer(r"^\s*#{1,3}\s*(?:📝\s*)?(?:study\s*notes|notes)\b.*$", text, _re.I | _re.M))
+            md_assign = list(_re.finditer(r"^\s*#{1,3}\s*(?:📄\s*)?(?:assignment(?:\s*questions)?|questions)\b.*$", text, _re.I | _re.M))
+            if md_notes and md_assign:
+                n0 = md_notes[0]
+                a0 = md_assign[0]
+                if n0.start() < a0.start():
+                    notes_str = text[n0.end():a0.start()].strip()
+                    assign_str = text[a0.end():].strip()
+                else:
+                    assign_str = text[a0.end():n0.start()].strip()
+                    notes_str = text[n0.end():].strip()
+
+        # 4) Last resort: split by the word 'assignment'
+        if not notes_str and not assign_str:
+            idx = text.lower().find("assignment")
+            if idx != -1:
+                notes_str = text[:idx].strip()
+                assign_str = text[idx + len("assignment"):].strip()
+
+        # 5) Ensure non-empty minimal outputs
+        notes_str = notes_str or text.strip()
+        assign_str = assign_str or "Write 5 questions based on the notes above (mix of MCQ, fill-in-the-blank, short answer)."
+
+        return {"notes": notes_str, "assignment": assign_str}
+
+    except Exception as e:
+        print(f"Parser error: {e}")
+        # Ensure both sections are non-empty even on parser error
+        return {
+            "notes": (gemini_text or "No notes generated."),
+            "assignment": "Write 5 questions based on the notes above (mix of MCQ, fill-in-the-blank, short answer)."
+        }
 
 def convert_text_to_html_for_pdf(topic, notes_content, assignment_content):
     notes_html = markdown.markdown(notes_content, extensions=['fenced_code', 'nl2br'])
@@ -296,7 +371,7 @@ def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
         
         # Set course metadata (this document will be small)
         course_ref.set({
-            'coursename': course_name,
+                'coursename': course_name,
             'created_at': firestore.SERVER_TIMESTAMP,
             'last_updated': firestore.SERVER_TIMESTAMP,
             'note_count': firestore.Increment(1)
@@ -1033,7 +1108,7 @@ def notes_view(request):
         doc = doc_ref.get()
         if doc.exists:
             user_profile = doc.to_dict()
-        
+            
         # Get notes from subcollections using the new function
         notes_pdfs = get_notes_from_firestore(firebase_uid)
 
@@ -1259,7 +1334,7 @@ def generate_study_notes(request):
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz.'})
 
         print(f"Syllabus content length: {len(syllabus_content)}")
-        
+
         soup = BeautifulSoup(syllabus_content, 'html.parser')
         raw_topics = []
         # Extract topics from H2 and H3 tags within the syllabus HTML
@@ -1318,7 +1393,7 @@ def generate_study_notes(request):
                 continue
 
         print(f"Generated {len(new_notes_generated)} notes successfully")
-        
+
         if new_notes_generated:
             return JsonResponse({'success': True, 'message': f'{len(new_notes_generated)} notes generated successfully!', 'notes': new_notes_generated})
         else:
