@@ -700,6 +700,63 @@
         
         // Run migration check on page load
         checkAndMigrateNotes();
+        
+        // Add diagnostic button for debugging
+        const diagnosticBtn = document.createElement('button');
+        diagnosticBtn.textContent = '🔧 Diagnose Issues';
+        diagnosticBtn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+        `;
+        diagnosticBtn.addEventListener('click', function() {
+            // Test environment
+            fetch('{% url "diagnose_environment" %}')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Environment diagnostics:', data);
+                if (data.success) {
+                    alert('Environment check completed. Check console for details.');
+                } else {
+                    alert('Environment check failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Diagnostic error:', error);
+                alert('Diagnostic failed: ' + error);
+            });
+            
+            // Test note generation
+            fetch('{% url "test_generate_notes" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Test generation results:', data);
+                if (data.success) {
+                    alert('Test generation successful! Check console for details.');
+                } else {
+                    alert('Test generation failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Test generation error:', error);
+                alert('Test generation failed: ' + error);
+            });
+        });
+        document.body.appendChild(diagnosticBtn);
     });
     
     // Add CSS for ripple effect
