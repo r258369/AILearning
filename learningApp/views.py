@@ -144,7 +144,7 @@ def get_relevant_channels_for_topic(topic, preferred_subjects):
             subject_channels.extend(CHANNEL_IDS[subject])
     return list(set(subject_channels))
 
-def generate_structured_content_with_gemini(topic, level,specific_goals):
+def generate_structured_content_with_gemini(topic, level, specific_goals):
     prompt = f'''
 Specific Goals: {specific_goals}
 Topic: {topic}\nLevel: {level}
@@ -155,11 +155,21 @@ Format for PDF:
 📄 Assignment Questions
 '''
     try:
+        print(f"Calling Gemini API for topic: {topic}")
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
-        return response.text
+        
+        if response and response.text:
+            print(f"Gemini response received, length: {len(response.text)}")
+            return response.text
+        else:
+            print(f"Gemini returned empty response for topic: {topic}")
+            return ""
+            
     except Exception as e:
+        import traceback
         print(f"Gemini error for {topic}: {e}")
+        print(f"Gemini error traceback: {traceback.format_exc()}")
         return ""
 
 def parse_gemini_content_to_sections(gemini_text):
@@ -231,23 +241,40 @@ def convert_text_to_html_for_pdf(topic, notes_content, assignment_content):
 
 def generate_pdf_from_content(content_dict, topic, user_id):
     try:
+        print(f"Starting PDF generation for topic: {topic}")
+        
         # Convert content to HTML
         html_string = convert_text_to_html_for_pdf(
             topic,
             content_dict["notes"],
             content_dict["assignment"]
         )
+        
+        print(f"HTML generated, length: {len(html_string)}")
 
-        # Generate PDF using WeasyPrint
-        # WeasyPrint can directly convert HTML string to PDF bytes
-        pdf_bytes = HTML(string=html_string).write_pdf()
+        # Try WeasyPrint first
+        try:
+            pdf_bytes = HTML(string=html_string).write_pdf()
+            print(f"PDF generated with WeasyPrint, size: {len(pdf_bytes)} bytes")
+        except Exception as weasyprint_error:
+            print(f"WeasyPrint failed: {weasyprint_error}")
+            # Fallback: return HTML content as data URL
+            html_base64 = base64.b64encode(html_string.encode('utf-8')).decode('utf-8')
+            result = f"data:text/html;base64,{html_base64}"
+            print(f"Fallback: returning HTML as data URL, length: {len(result)}")
+            return result
 
         # Encode to base64
         pdf_content_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-        return f"data:application/pdf;base64,{pdf_content_base64}"
+        result = f"data:application/pdf;base64,{pdf_content_base64}"
+        
+        print(f"PDF encoded to base64, total length: {len(result)}")
+        return result
 
     except Exception as e:
+        import traceback
         print(f"Error generating PDF with WeasyPrint: {e}")
+        print(f"PDF generation traceback: {traceback.format_exc()}")
         return None
 
 def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
@@ -1212,18 +1239,27 @@ def generate_study_notes(request):
         return JsonResponse({'success': False, 'error': 'User not authenticated.'})
 
     try:
+        print(f"Starting study notes generation for user: {firebase_uid}")
+        
         user_ref = db.collection('user_profiles').document(firebase_uid)
         user_doc = user_ref.get()
         if not user_doc.exists:
+            print(f"User profile not found for: {firebase_uid}")
             return JsonResponse({'success': False, 'error': 'User profile not found.'})
         
         user_profile_data = user_doc.to_dict()
         syllabus_content = user_profile_data.get('generated_syllabus')
         skill_level = user_profile_data.get('skill_level', 'beginner')
         specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
+        
+        print(f"User data - skill_level: {skill_level}, specific_goals: {specific_goals}")
+        
         if not syllabus_content:
+            print(f"No syllabus content found for user: {firebase_uid}")
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz.'})
 
+        print(f"Syllabus content length: {len(syllabus_content)}")
+        
         soup = BeautifulSoup(syllabus_content, 'html.parser')
         raw_topics = []
         # Extract topics from H2 and H3 tags within the syllabus HTML
@@ -1231,6 +1267,8 @@ def generate_study_notes(request):
             topic = heading.get_text(strip=True)
             if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:# Filter out common non-topic headings
                 raw_topics.append(topic)
+        
+        print(f"Found {len(raw_topics)} topics: {raw_topics}")
         
         if not raw_topics:
             return JsonResponse({'success': False, 'error': 'No topics found in the syllabus to generate notes for.'})
@@ -1242,37 +1280,54 @@ def generate_study_notes(request):
             goals_list = [goal.strip() for goal in specific_goals.split(',')]
             determined_course_name = goals_list[0].title()
         
+        print(f"Determined course name: {determined_course_name}")
+        
         for topic in raw_topics:
             print(f"Generating notes for topic: {topic}")
             
-            # Step 1: Generate structured content using Gemini (now includes web search internally)
-            gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
-            
-            # Step 2: Parse Gemini content into sections
-            content_sections = parse_gemini_content_to_sections(gemini_content)
-            
-            if content_sections.get('notes') and content_sections.get('assignment'):
-                # Step 3: Generate PDF
-                pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
+            try:
+                # Step 1: Generate structured content using Gemini (now includes web search internally)
+                gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
                 
-                if pdf_content_base64:
-                    # Step 4: Save PDF content to Firestore with the determined course name
-                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
-                        new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
+                if not gemini_content:
+                    print(f"Gemini returned empty content for topic: {topic}")
+                    continue
+                
+                # Step 2: Parse Gemini content into sections
+                content_sections = parse_gemini_content_to_sections(gemini_content)
+                
+                if content_sections.get('notes') and content_sections.get('assignment'):
+                    # Step 3: Generate PDF
+                    pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
+                    
+                    if pdf_content_base64:
+                        # Step 4: Save PDF content to Firestore with the determined course name
+                        if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
+                            new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
+                            print(f"Successfully generated and saved note for topic: {topic}")
+                        else:
+                            print(f"Failed to save PDF for topic: {topic}")
                     else:
-                        print(f"Failed to save PDF for topic: {topic}")
+                        print(f"Failed to generate PDF for topic: {topic}")
                 else:
-                    print(f"Failed to generate PDF for topic: {topic}")
-            else:
-                print(f"Gemini did not return complete notes and assignment for topic: {topic}")
+                    print(f"Gemini did not return complete notes and assignment for topic: {topic}")
+                    print(f"Content sections: {content_sections}")
+                    
+            except Exception as topic_error:
+                print(f"Error processing topic '{topic}': {topic_error}")
+                continue
 
+        print(f"Generated {len(new_notes_generated)} notes successfully")
+        
         if new_notes_generated:
             return JsonResponse({'success': True, 'message': f'{len(new_notes_generated)} notes generated successfully!', 'notes': new_notes_generated})
         else:
             return JsonResponse({'success': False, 'error': 'No notes could be generated. Please ensure your syllabus has clear topics.'})
 
     except Exception as e:
+        import traceback
         print(f"Error generating study notes: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
 
 
@@ -1360,6 +1415,129 @@ def delete_study_note(request):
     except Exception as e:
         print(f"Error deleting study note: {e}")
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+
+
+@login_required
+@require_POST
+def test_generate_notes(request):
+    """Test endpoint to check if basic note generation works"""
+    firebase_uid = request.session.get('firebase_user', {}).get('uid')
+    if not firebase_uid:
+        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
+
+    try:
+        # Test basic functionality
+        test_topic = "Basic Mathematics"
+        test_level = "beginner"
+        test_goals = "learn fundamentals"
+        
+        print("Testing Gemini API...")
+        gemini_content = generate_structured_content_with_gemini(test_topic, test_level, test_goals)
+        
+        if not gemini_content:
+            return JsonResponse({'success': False, 'error': 'Gemini API test failed - no content returned'})
+        
+        print("Testing content parsing...")
+        content_sections = parse_gemini_content_to_sections(gemini_content)
+        
+        if not content_sections.get('notes') or not content_sections.get('assignment'):
+            return JsonResponse({'success': False, 'error': 'Content parsing test failed - missing sections'})
+        
+        print("Testing PDF generation...")
+        pdf_content = generate_pdf_from_content(content_sections, test_topic, firebase_uid)
+        
+        if not pdf_content:
+            return JsonResponse({'success': False, 'error': 'PDF generation test failed'})
+        
+        return JsonResponse({
+            'success': True, 
+            'message': 'All tests passed!',
+            'gemini_content_length': len(gemini_content),
+            'notes_length': len(content_sections.get('notes', '')),
+            'assignment_length': len(content_sections.get('assignment', '')),
+            'pdf_length': len(pdf_content)
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"Test error: {e}")
+        print(f"Test traceback: {traceback.format_exc()}")
+        return JsonResponse({'success': False, 'error': f'Test failed: {str(e)}'})
+
+
+@login_required
+def diagnose_environment(request):
+    """Diagnostic endpoint to check environment and dependencies"""
+    try:
+        diagnostics = {
+            'django_version': 'OK',
+            'firebase_admin': 'OK',
+            'google_generativeai': 'OK',
+            'beautifulsoup4': 'OK',
+            'markdown': 'OK',
+            'weasyprint': 'Unknown',
+            'base64': 'OK',
+            'json': 'OK',
+            're': 'OK'
+        }
+        
+        # Test imports
+        try:
+            import django
+            diagnostics['django_version'] = django.get_version()
+        except Exception as e:
+            diagnostics['django_version'] = f'Error: {e}'
+        
+        try:
+            import firebase_admin
+            diagnostics['firebase_admin'] = 'OK'
+        except Exception as e:
+            diagnostics['firebase_admin'] = f'Error: {e}'
+        
+        try:
+            import google.generativeai
+            diagnostics['google_generativeai'] = 'OK'
+        except Exception as e:
+            diagnostics['google_generativeai'] = f'Error: {e}'
+        
+        try:
+            from bs4 import BeautifulSoup
+            diagnostics['beautifulsoup4'] = 'OK'
+        except Exception as e:
+            diagnostics['beautifulsoup4'] = f'Error: {e}'
+        
+        try:
+            import markdown
+            diagnostics['markdown'] = 'OK'
+        except Exception as e:
+            diagnostics['markdown'] = f'Error: {e}'
+        
+        try:
+            from weasyprint import HTML
+            diagnostics['weasyprint'] = 'OK'
+        except Exception as e:
+            diagnostics['weasyprint'] = f'Error: {e}'
+        
+        # Test basic functionality
+        try:
+            test_html = "<h1>Test</h1><p>Hello World</p>"
+            test_md = "# Test\nHello World"
+            md_html = markdown.markdown(test_md)
+            diagnostics['markdown_processing'] = 'OK'
+        except Exception as e:
+            diagnostics['markdown_processing'] = f'Error: {e}'
+        
+        return JsonResponse({
+            'success': True,
+            'diagnostics': diagnostics,
+            'message': 'Environment check completed'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Diagnostic failed: {str(e)}'
+        })
 
 
 @login_required
