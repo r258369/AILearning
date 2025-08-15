@@ -1,33 +1,31 @@
 from datetime import datetime
 from bs4 import BeautifulSoup
-# from googleapiclient.discovery import build  # Removed YouTube API import
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
-import requests
-from .forms import UserProfileForm, SignupForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from firebase_config import db
-from firebase_admin import firestore, auth
-import google.generativeai as genai
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth import login, logout
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from django.conf import settings
+from django.urls import reverse
+import requests
 import json
-import wikipedia
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+import re
+import base64
 import tempfile
 import os
-from firebase_admin import storage
-import re
-from django.views.decorators.http import require_POST
-from django.utils import timezone
-import json
-import base64
-
+import wikipedia
 import markdown
 from weasyprint import HTML, CSS
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from firebase_config import db
+from firebase_admin import firestore, auth, storage
+import google.generativeai as genai
+from .forms import UserProfileForm, SignupForm
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
@@ -479,107 +477,93 @@ def signup_view(request):
         form = SignupForm()
     return render(request, 'signup.html', {'form': form})
 
+@csrf_exempt
 def onboarding_quiz_view(request):
     # Using session to store quiz data across steps
     quiz_data = request.session.get('onboarding_quiz_data', {})
 
     if request.method == 'POST':
         try:
-            print(f"DEBUG: POST data received: {request.POST}")
-            print(f"DEBUG: CSRF token in POST: {request.POST.get('csrfmiddlewaretoken', 'NOT_FOUND')}")
-            print(f"DEBUG: CSRF token in session: {request.session.get('csrf_token', 'NOT_FOUND')}")
-            print(f"DEBUG: Is AJAX request: {request.headers.get('X-Requested-With') == 'XMLHttpRequest'}")
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            print(f"DEBUG: Processing {'AJAX' if is_ajax else 'regular'} request")
+            print(f"DEBUG: POST data: {dict(request.POST)}")
             
-            # For AJAX requests, we might need to handle CSRF differently
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                print(f"DEBUG: Processing AJAX request")
-                # For AJAX requests in dev tunnel, we'll validate the token manually
-                post_token = request.POST.get('csrfmiddlewaretoken')
-                if post_token:
-                    print(f"DEBUG: Manual CSRF validation for AJAX request")
-                    # Skip Django's CSRF validation for AJAX requests in dev tunnel
-                    # This is a workaround for the tunnel's CSRF issues
-                else:
-                    print(f"DEBUG: No CSRF token in POST data")
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'CSRF token missing. Please refresh the page and try again.'
-                    })
-                
-                # For AJAX requests, temporarily disable CSRF validation
-                from django.views.decorators.csrf import csrf_exempt
-                from functools import wraps
-                
-                # This is a workaround for dev tunnel CSRF issues
-                print(f"DEBUG: Temporarily bypassing CSRF for AJAX request")
+            # Create and validate form
+            form = UserProfileForm(request.POST, initial=quiz_data)
+            print(f"DEBUG: Form is valid: {form.is_valid()}")
+            if not form.is_valid():
+                print(f"DEBUG: Form errors: {form.errors}")
             
-            # For AJAX requests, manually validate form data without CSRF
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                print(f"DEBUG: Manual form validation for AJAX request")
-                # Manually validate form data
-                learning_style = request.POST.get('learning_style')
-                preferred_subjects = request.POST.get('preferred_subjects')
-                skill_level = request.POST.get('skill_level')
-                specific_goals = request.POST.get('specific_goals')
-                
-                if not all([learning_style, preferred_subjects, skill_level, specific_goals]):
-                    print(f"DEBUG: Manual validation failed - missing required fields")
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'All fields are required. Please fill in all fields.'
-                    })
-                
-                print(f"DEBUG: Manual validation successful")
-                # Create form data manually
-                form_data = {
-                    'learning_style': learning_style,
-                    'preferred_subjects': preferred_subjects,
-                    'skill_level': skill_level,
-                    'specific_goals': specific_goals
-                }
-                form = UserProfileForm(form_data, initial=quiz_data)
-            else:
-                # Regular form validation for non-AJAX requests
-                form = UserProfileForm(request.POST, initial=quiz_data)
-                print(f"DEBUG: Form is valid: {form.is_valid()}")
-                
-                if not form.is_valid():
-                    print(f"DEBUG: Form validation failed: {form.errors}")
-                    return render(request, 'onboarding_quiz.html', {'form': form, 'form_errors': form.errors})
-            
-            # Form is valid, process the data
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                # Use manually validated data for AJAX requests
-                quiz_data.update(form_data)
-            else:
-                # Use form cleaned data for regular requests
+            if form.is_valid():
+                # Update quiz data with form data
                 for key, value in form.cleaned_data.items():
                     quiz_data[key] = value
-            
-            request.session['onboarding_quiz_data'] = quiz_data
+                
+                request.session['onboarding_quiz_data'] = quiz_data
 
-            # Save to Firebase Firestore
-            if not request.user.is_authenticated:
-                return redirect('login')
-            
-            firebase_uid = request.session.get('firebase_user', {}).get('uid')
-            
-            if not firebase_uid:
-                messages.error(request, "Firebase user not found in session for profile update.")
-                return redirect('login')
-            
-            try:
-                doc_ref = db.collection('user_profiles').document(firebase_uid)
-                doc_ref.set({
-                    'learning_style': quiz_data.get('learning_style'),
-                    'preferred_subjects': quiz_data.get('preferred_subjects'),
-                    'skill_level': quiz_data.get('skill_level'),
-                    'specific_goals': quiz_data.get('specific_goals'),
-                    'last_updated': firestore.SERVER_TIMESTAMP
-                }, merge=True)
-            except Exception as firebase_error:
-                messages.error(request, f"Failed to save profile: {firebase_error}")
-                return render(request, 'onboarding_quiz.html', {'form': form, 'error': str(firebase_error)})
+                # Check authentication
+                if not request.user.is_authenticated:
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'User not authenticated. Please log in.'
+                        })
+                    return redirect('login')
+                
+                firebase_uid = request.session.get('firebase_user', {}).get('uid')
+                
+                if not firebase_uid:
+                    error_msg = "Firebase user not found in session for profile update."
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': False,
+                            'error': error_msg
+                        })
+                    messages.error(request, error_msg)
+                    return redirect('login')
+                
+                # Save to Firebase Firestore
+                try:
+                    print(f"DEBUG: Saving to Firebase for user: {firebase_uid}")
+                    doc_ref = db.collection('user_profiles').document(firebase_uid)
+                    doc_ref.set({
+                        'learning_style': quiz_data.get('learning_style'),
+                        'preferred_subjects': quiz_data.get('preferred_subjects'),
+                        'skill_level': quiz_data.get('skill_level'),
+                        'specific_goals': quiz_data.get('specific_goals'),
+                        'last_updated': firestore.SERVER_TIMESTAMP
+                    }, merge=True)
+                    print(f"DEBUG: Successfully saved to Firebase")
+                except Exception as firebase_error:
+                    print(f"DEBUG: Firebase error: {firebase_error}")
+                    error_msg = f"Failed to save profile: {firebase_error}"
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': False,
+                            'error': error_msg
+                        })
+                    messages.error(request, error_msg)
+                    return render(request, 'onboarding_quiz.html', {'form': form, 'error': str(firebase_error)})
+            else:
+                # Form validation failed
+                if is_ajax:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Please fill in all required fields correctly.'
+                    })
+                return render(request, 'onboarding_quiz.html', {'form': form, 'form_errors': form.errors})
+
+            # Generate and save syllabus after profile update
+            user_profile_data = quiz_data
+            syllabus_content = "No syllabus generated. Please complete your profile and try again."
+
+            if user_profile_data:
+                profile = {
+                    'level': user_profile_data.get('skill_level', 'beginner'),
+                    'subject': user_profile_data.get('preferred_subjects', 'general knowledge'),
+                    'style': user_profile_data.get('learning_style', 'visual'),
+                    'goal': user_profile_data.get('specific_goals', 'learn new concepts')
+                }
 
             # Generate and save syllabus after profile update
             user_profile_data = quiz_data
@@ -604,112 +588,128 @@ Please structure it as a clean, detailed **HTML syllabus layout** with:
 - Bullet points for activities (`<ul>`, `<li>`)
 - Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
 - Make the section visually appealing with appropriate HTML tags.
-Important: Always keep the each day topics name undre <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **inside the body tag**, NOT the full HTML structure 
+Important: Always keep the each day topics name under <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
 (no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
 Just give me the **content portion** that I can embed directly into my existing Django template.
 """
 
                 try:
+                    print(f"DEBUG: Generating syllabus with Gemini")
                     model = genai.GenerativeModel("gemini-2.5-flash")
                     response = model.generate_content(prompt)
                     syllabus_content = response.text
+                    print(f"DEBUG: Syllabus generated successfully")
 
                     # Save generated syllabus to Firestore
                     user_profile_ref = db.collection('user_profiles').document(firebase_uid)
                     user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                    print(f"DEBUG: Syllabus saved to Firebase")
 
-                                        # --- Gemini-based YouTube video recommendations ---
-                    soup = BeautifulSoup(syllabus_content, 'html.parser')
-                    raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
-                    topics_for_videos = []
-                    for topic in raw_topics:
-                        cleaned_topic = topic.lower()
-                        remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
-                        for word in remove_words:
-                            cleaned_topic = cleaned_topic.replace(word, '').strip()
-                        if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                            topics_for_videos.append(cleaned_topic.title())
-                    
-                    recommended_videos_data = []
-                    
-                    # Limit video generation to avoid timeouts
-                    max_topics = min(2, len(topics_for_videos))
-                    
-                    for i, topic in enumerate(topics_for_videos[:max_topics]):
-                        if i >= 2:  # Safety limit
-                            break
-                        channel_ids = get_relevant_channels_for_topic(topic, user_profile_data.get('preferred_subjects', ''))
-                        channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
-                        gemini_video_prompt = f"""
-You are an expert educational video recommender. Here is the full HTML syllabus for context:
------
-{syllabus_content}
------
-For the topic: '{topic}', recommend up to 3 highly relevant YouTube videos. Only select videos from these channel IDs: {channel_id_str}.
-For each video, provide:
-- title
-- video_id (YouTube video ID only)
-- channel_title (the channel's display name)
-Return the result as a JSON array like this:
+                    # --- Gemini-based YouTube video recommendations ---
+                    try:
+                        print(f"DEBUG: Starting video recommendations")
+                        soup = BeautifulSoup(syllabus_content, 'html.parser')
+                        raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
+                        topics_for_videos = []
+                        for topic in raw_topics:
+                            cleaned_topic = topic.lower()
+                            remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
+                            for word in remove_words:
+                                cleaned_topic = cleaned_topic.replace(word, '').strip()
+                            if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
+                                topics_for_videos.append(cleaned_topic.title())
+                        
+                        print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
+                        recommended_videos_data = []
+                        
+                        # Limit to first 5 topics to avoid timeout
+                        for i, topic in enumerate(topics_for_videos[:5]):
+                            try:
+                                channel_ids = get_relevant_channels_for_topic(topic, user_profile_data.get('preferred_subjects', ''))
+                                channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
+                                gemini_video_prompt = f"""
+For the topic: '{topic}', recommend up to 2 highly relevant YouTube videos from these channels: {channel_id_str}.
+Return only a JSON array:
 [
   {{"title": "...", "video_id": "...", "channel_title": "..."}},
   ...
 ]
-If you can't find 3, return as many as possible. Do not include videos from other channels. Only output the JSON array, nothing else.
 """
-                        try:
-                            video_response = model.generate_content(gemini_video_prompt)
-                            videos = []
-                            try:
-                                videos = json.loads(video_response.text)
-                            except Exception:
-                                # Try to extract JSON from text if Gemini adds extra text
-                                import re
-                                match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
-                                if match:
-                                    videos = json.loads(match.group(1))
-                            # Filter/validate structure
-                            valid_videos = [
-                                {
-                                    'title': v.get('title', ''),
-                                    'video_id': v.get('video_id', ''),
-                                    'channel_title': v.get('channel_title', '')
-                                }
-                                for v in videos if v.get('title') and v.get('video_id')
-                            ]
-                            if valid_videos:
-                                recommended_videos_data.append({
-                                    'topic': topic,
-                                    'videos': valid_videos
-                                })
-                        except Exception as e:
-                            print(f"Gemini video fetch error for topic '{topic}': {e}")
-                            continue
-                    
-                    # Save recommended videos to Firestore
-                    user_profile_ref.set({'recommended_videos': recommended_videos_data, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                                video_response = model.generate_content(gemini_video_prompt)
+                                videos = []
+                                try:
+                                    videos = json.loads(video_response.text)
+                                except Exception:
+                                    # Try to extract JSON from text if Gemini adds extra text
+                                    match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
+                                    if match:
+                                        videos = json.loads(match.group(1))
+                                
+                                # Filter/validate structure
+                                valid_videos = [
+                                    {
+                                        'title': v.get('title', ''),
+                                        'video_id': v.get('video_id', ''),
+                                        'channel_title': v.get('channel_title', '')
+                                    }
+                                    for v in videos if v.get('title') and v.get('video_id')
+                                ]
+                                
+                                if valid_videos:
+                                    recommended_videos_data.append({
+                                        'topic': topic,
+                                        'videos': valid_videos
+                                    })
+                                    
+                            except Exception as e:
+                                print(f"DEBUG: Video fetch error for topic '{topic}': {e}")
+                                continue
+                        
+                        # Save recommended videos to Firestore
+                        if recommended_videos_data:
+                            user_profile_ref.set({'recommended_videos': recommended_videos_data, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                            print(f"DEBUG: Saved {len(recommended_videos_data)} video topics")
+                        
+                    except Exception as video_error:
+                        print(f"DEBUG: Video generation failed completely: {video_error}")
+                        # Continue without videos
                     # --- End Gemini-based video recommendations ---
 
                 except Exception as e:
-                    syllabus_content = f"Error generating syllabus: {e}"
-                    messages.error(request, f"Failed to generate syllabus: {e}")
+                    print(f"DEBUG: Error generating syllabus: {e}")
+                    # Don't fail the entire process if syllabus generation fails
+                    # Just continue without syllabus and videos
+                    syllabus_content = f"<h2>Welcome to your learning journey!</h2><p>Your profile has been saved successfully. We'll generate your personalized syllabus shortly.</p>"
+                    
+                    # Save a basic syllabus to Firebase
+                    try:
+                        user_profile_ref = db.collection('user_profiles').document(firebase_uid)
+                        user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                    except Exception as fb_error:
+                        print(f"DEBUG: Failed to save basic syllabus: {fb_error}")
+                    
+                    print(f"DEBUG: Continuing with basic syllabus due to generation error")
 
             # Clear quiz data from session
             if 'onboarding_quiz_data' in request.session:
                 del request.session['onboarding_quiz_data']
             
             # Return JSON response for AJAX requests
-            from django.urls import reverse
-            from django.http import JsonResponse
-            
-            syllabus_url = reverse('syllabus')
-            return JsonResponse({
-                'success': True,
-                'message': 'Profile updated successfully!',
-                'redirect_url': syllabus_url
-            })
+            if is_ajax:
+                syllabus_url = reverse('syllabus')
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Profile updated successfully!',
+                    'redirect_url': syllabus_url
+                })
+            else:
+                return redirect('syllabus')
                 
         except Exception as e:
+            print(f"DEBUG: Unexpected error in onboarding_quiz_view: {e}")
+            import traceback
+            traceback.print_exc()
+            
             # For AJAX requests, return JSON error
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
