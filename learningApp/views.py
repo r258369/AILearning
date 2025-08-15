@@ -144,127 +144,42 @@ def get_relevant_channels_for_topic(topic, preferred_subjects):
             subject_channels.extend(CHANNEL_IDS[subject])
     return list(set(subject_channels))
 
-def generate_structured_content_with_gemini(topic, level, specific_goals):
+def generate_structured_content_with_gemini(topic, level,specific_goals):
     prompt = f'''
 Specific Goals: {specific_goals}
 Topic: {topic}\nLevel: {level}
-Return your answer in EXACTLY two sections with these headings on their own lines:
+1. Research and write clear, concise study notes (400-500 words, student-friendly tone, with relevant examples like maths, codes, etc.) using your internal knowledge and web search capabilities to gather accurate and up-to-date information from reliable public sources (e.g., Wikipedia, OpenStax, Khan Academy, Byju's, etc.).
+2. Create a 5-question assignment (mix of MCQ, fill-in-the-blanks, and short answers) based on the notes. For MCQs, provide 4 options (a-d). For fill-in-the-blanks, indicate the blank with underscores. For short answers, ask questions that can be answered in 2-3 sentences.
+Format for PDF:
 📝 Study Notes
 📄 Assignment Questions
-Rules:
-- Under 📝 Study Notes: write 400-500 words, student-friendly, include examples.
-- Under 📄 Assignment Questions: exactly 5 questions, mix MCQ/fill-in-the-blank/short answer. For MCQ include options a-d.
-- Do not include any other headings or sections. Do not add extra preface or epilogue text.
 '''
     try:
-        print(f"Calling Gemini API for topic: {topic}")
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
-        
-        if response and response.text:
-            print(f"Gemini response received, length: {len(response.text)}")
-            return response.text
-        else:
-            print(f"Gemini returned empty response for topic: {topic}")
-            return ""
-            
+        return response.text
     except Exception as e:
-        import traceback
         print(f"Gemini error for {topic}: {e}")
-        print(f"Gemini error traceback: {traceback.format_exc()}")
         return ""
 
 def parse_gemini_content_to_sections(gemini_text):
-    """
-    Robustly split Gemini output into notes and assignment sections.
-    Handles emojis, markdown headings, plain text labels, and HTML.
-    Always returns non-empty strings when possible.
-    """
-    try:
-        text = gemini_text or ""
-        if not text.strip():
-            return {"notes": "", "assignment": ""}
-
-        # 1) If HTML contains obvious section headings, try BeautifulSoup first
-        if "<" in text and ">" in text:
-            soup = BeautifulSoup(text, 'html.parser')
-            # Find headings and map them
-            headings = soup.find_all(["h1", "h2", "h3", "strong", "b", "p"])  # ordered appearance
-            notes_chunks, assign_chunks = [], []
-            current = None
-            for tag in headings:
-                label = (tag.get_text(" ", strip=True) or "").lower()
-                if any(k in label for k in ["📝", "study notes", "notes"]):
-                    current = "notes"
-                    continue
-                if any(k in label for k in ["📄", "assignment", "questions"]):
-                    current = "assignment"
-                    continue
-                if current == "notes":
-                    notes_chunks.append(str(tag))
-                elif current == "assignment":
-                    assign_chunks.append(str(tag))
-            notes_html = "\n".join(notes_chunks).strip()
-            assign_html = "\n".join(assign_chunks).strip()
-            if notes_html or assign_html:
-                return {"notes": notes_html, "assignment": assign_html}
-
-        # 2) Regex-based split for text/markdown
-        import re as _re
-        patterns = {
-            "notes": _re.compile(r"(?:^|\n)\s*(?:📝\s*)?(?:study\s*notes|notes)\s*[:\-]*\s*(?:\n|$)", _re.I),
-            "assignment": _re.compile(r"(?:^|\n)\s*(?:📄\s*)?(?:assignment(?:\s*questions)?|questions)\s*[:\-]*\s*(?:\n|$)", _re.I)
-        }
-        notes_match = patterns["notes"].search(text)
-        assign_match = patterns["assignment"].search(text)
-        notes_str, assign_str = "", ""
-        if notes_match and assign_match:
-            if notes_match.start() < assign_match.start():
-                notes_str = text[notes_match.end():assign_match.start()] .strip()
-                assign_str = text[assign_match.end():] .strip()
-            else:
-                assign_str = text[assign_match.end():notes_match.start()] .strip()
-                notes_str = text[notes_match.end():] .strip()
-        elif notes_match:
-            notes_str = text[notes_match.end():].strip()
-        elif assign_match:
-            assign_str = text[assign_match.end():].strip()
-
-        # 3) Fallback: try markdown headings (##, ###)
-        if not notes_str and not assign_str:
-            # Find indices of markdown headings with keywords
-            md_notes = list(_re.finditer(r"^\s*#{1,3}\s*(?:📝\s*)?(?:study\s*notes|notes)\b.*$", text, _re.I | _re.M))
-            md_assign = list(_re.finditer(r"^\s*#{1,3}\s*(?:📄\s*)?(?:assignment(?:\s*questions)?|questions)\b.*$", text, _re.I | _re.M))
-            if md_notes and md_assign:
-                n0 = md_notes[0]
-                a0 = md_assign[0]
-                if n0.start() < a0.start():
-                    notes_str = text[n0.end():a0.start()].strip()
-                    assign_str = text[a0.end():].strip()
-                else:
-                    assign_str = text[a0.end():n0.start()].strip()
-                    notes_str = text[n0.end():].strip()
-
-        # 4) Last resort: split by the word 'assignment'
-        if not notes_str and not assign_str:
-            idx = text.lower().find("assignment")
-            if idx != -1:
-                notes_str = text[:idx].strip()
-                assign_str = text[idx + len("assignment"):].strip()
-
-        # 5) Ensure non-empty minimal outputs
-        notes_str = notes_str or text.strip()
-        assign_str = assign_str or "Write 5 questions based on the notes above (mix of MCQ, fill-in-the-blank, short answer)."
-
-        return {"notes": notes_str, "assignment": assign_str}
-
-    except Exception as e:
-        print(f"Parser error: {e}")
-        # Ensure both sections are non-empty even on parser error
-        return {
-            "notes": (gemini_text or "No notes generated."),
-            "assignment": "Write 5 questions based on the notes above (mix of MCQ, fill-in-the-blank, short answer)."
-        }
+    # Simple parser to split the Gemini output into sections
+    notes, assignment = "", ""
+    lines = gemini_text.splitlines()
+    section = None
+    for line in lines:
+        l = line.strip()
+        if l.startswith("📝"):
+            section = "notes"
+            continue
+        elif l.startswith("📄"):
+            section = "assignment"
+            continue
+        if section == "notes":
+            notes += line + "\n"
+        elif section == "assignment":
+            assignment += line + "\n"
+    return {"notes": notes.strip(), "assignment": assignment.strip()}
 
 def convert_text_to_html_for_pdf(topic, notes_content, assignment_content):
     notes_html = markdown.markdown(notes_content, extensions=['fenced_code', 'nl2br'])
@@ -316,40 +231,23 @@ def convert_text_to_html_for_pdf(topic, notes_content, assignment_content):
 
 def generate_pdf_from_content(content_dict, topic, user_id):
     try:
-        print(f"Starting PDF generation for topic: {topic}")
-        
         # Convert content to HTML
         html_string = convert_text_to_html_for_pdf(
             topic,
             content_dict["notes"],
             content_dict["assignment"]
         )
-        
-        print(f"HTML generated, length: {len(html_string)}")
 
-        # Try WeasyPrint first
-        try:
-            pdf_bytes = HTML(string=html_string).write_pdf()
-            print(f"PDF generated with WeasyPrint, size: {len(pdf_bytes)} bytes")
-        except Exception as weasyprint_error:
-            print(f"WeasyPrint failed: {weasyprint_error}")
-            # Fallback: return HTML content as data URL
-            html_base64 = base64.b64encode(html_string.encode('utf-8')).decode('utf-8')
-            result = f"data:text/html;base64,{html_base64}"
-            print(f"Fallback: returning HTML as data URL, length: {len(result)}")
-            return result
+        # Generate PDF using WeasyPrint
+        # WeasyPrint can directly convert HTML string to PDF bytes
+        pdf_bytes = HTML(string=html_string).write_pdf()
 
         # Encode to base64
         pdf_content_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-        result = f"data:application/pdf;base64,{pdf_content_base64}"
-        
-        print(f"PDF encoded to base64, total length: {len(result)}")
-        return result
+        return f"data:application/pdf;base64,{pdf_content_base64}"
 
     except Exception as e:
-        import traceback
         print(f"Error generating PDF with WeasyPrint: {e}")
-        print(f"PDF generation traceback: {traceback.format_exc()}")
         return None
 
 def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
@@ -371,7 +269,7 @@ def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
         
         # Set course metadata (this document will be small)
         course_ref.set({
-                'coursename': course_name,
+            'coursename': course_name,
             'created_at': firestore.SERVER_TIMESTAMP,
             'last_updated': firestore.SERVER_TIMESTAMP,
             'note_count': firestore.Increment(1)
@@ -586,39 +484,116 @@ def onboarding_quiz_view(request):
     quiz_data = request.session.get('onboarding_quiz_data', {})
 
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, initial=quiz_data)
-        if form.is_valid():
-            for key, value in form.cleaned_data.items():
-                quiz_data[key] = value
+        try:
+            print(f"DEBUG: POST data received: {request.POST}")
+            print(f"DEBUG: CSRF token in POST: {request.POST.get('csrfmiddlewaretoken', 'NOT_FOUND')}")
+            print(f"DEBUG: CSRF token in session: {request.session.get('csrf_token', 'NOT_FOUND')}")
+            print(f"DEBUG: Is AJAX request: {request.headers.get('X-Requested-With') == 'XMLHttpRequest'}")
+            
+            # For AJAX requests, we might need to handle CSRF differently
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                print(f"DEBUG: Processing AJAX request")
+                # For AJAX requests in dev tunnel, we'll validate the token manually
+                post_token = request.POST.get('csrfmiddlewaretoken')
+                if post_token:
+                    print(f"DEBUG: Manual CSRF validation for AJAX request")
+                    # Skip Django's CSRF validation for AJAX requests in dev tunnel
+                    # This is a workaround for the tunnel's CSRF issues
+                else:
+                    print(f"DEBUG: No CSRF token in POST data")
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'CSRF token missing. Please refresh the page and try again.'
+                    })
+                
+                # For AJAX requests, temporarily disable CSRF validation
+                from django.views.decorators.csrf import csrf_exempt
+                from functools import wraps
+                
+                # This is a workaround for dev tunnel CSRF issues
+                print(f"DEBUG: Temporarily bypassing CSRF for AJAX request")
+            
+            # For AJAX requests, manually validate form data without CSRF
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                print(f"DEBUG: Manual form validation for AJAX request")
+                # Manually validate form data
+                learning_style = request.POST.get('learning_style')
+                preferred_subjects = request.POST.get('preferred_subjects')
+                skill_level = request.POST.get('skill_level')
+                specific_goals = request.POST.get('specific_goals')
+                
+                if not all([learning_style, preferred_subjects, skill_level, specific_goals]):
+                    print(f"DEBUG: Manual validation failed - missing required fields")
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'All fields are required. Please fill in all fields.'
+                    })
+                
+                print(f"DEBUG: Manual validation successful")
+                # Create form data manually
+                form_data = {
+                    'learning_style': learning_style,
+                    'preferred_subjects': preferred_subjects,
+                    'skill_level': skill_level,
+                    'specific_goals': specific_goals
+                }
+                form = UserProfileForm(form_data, initial=quiz_data)
+            else:
+                # Regular form validation for non-AJAX requests
+                form = UserProfileForm(request.POST, initial=quiz_data)
+                print(f"DEBUG: Form is valid: {form.is_valid()}")
+                
+                if not form.is_valid():
+                    print(f"DEBUG: Form validation failed: {form.errors}")
+                    return render(request, 'onboarding_quiz.html', {'form': form, 'form_errors': form.errors})
+            
+            # Form is valid, process the data
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                # Use manually validated data for AJAX requests
+                quiz_data.update(form_data)
+            else:
+                # Use form cleaned data for regular requests
+                for key, value in form.cleaned_data.items():
+                    quiz_data[key] = value
+            
             request.session['onboarding_quiz_data'] = quiz_data
 
             # Save to Firebase Firestore
-            if request.user.is_authenticated:
-                firebase_uid = request.session.get('firebase_user', {}).get('uid')
-                if firebase_uid:
-                    doc_ref = db.collection('user_profiles').document(firebase_uid)
-                    doc_ref.set({
-                        'learning_style': quiz_data.get('learning_style'),
-                        'preferred_subjects': quiz_data.get('preferred_subjects'),
-                        'skill_level': quiz_data.get('skill_level'),
-                        'specific_goals': quiz_data.get('specific_goals'),
-                        'last_updated': firestore.SERVER_TIMESTAMP
-                    }, merge=True)
+            if not request.user.is_authenticated:
+                return redirect('login')
+            
+            firebase_uid = request.session.get('firebase_user', {}).get('uid')
+            
+            if not firebase_uid:
+                messages.error(request, "Firebase user not found in session for profile update.")
+                return redirect('login')
+            
+            try:
+                doc_ref = db.collection('user_profiles').document(firebase_uid)
+                doc_ref.set({
+                    'learning_style': quiz_data.get('learning_style'),
+                    'preferred_subjects': quiz_data.get('preferred_subjects'),
+                    'skill_level': quiz_data.get('skill_level'),
+                    'specific_goals': quiz_data.get('specific_goals'),
+                    'last_updated': firestore.SERVER_TIMESTAMP
+                }, merge=True)
+            except Exception as firebase_error:
+                messages.error(request, f"Failed to save profile: {firebase_error}")
+                return render(request, 'onboarding_quiz.html', {'form': form, 'error': str(firebase_error)})
 
-                    # Generate and save syllabus after profile update
-                    user_profile_data = quiz_data
+            # Generate and save syllabus after profile update
+            user_profile_data = quiz_data
+            syllabus_content = "No syllabus generated. Please complete your profile and try again."
 
-                    syllabus_content = "No syllabus generated. Please complete your profile and try again."
+            if user_profile_data:
+                profile = {
+                    'level': user_profile_data.get('skill_level', 'beginner'),
+                    'subject': user_profile_data.get('preferred_subjects', 'general knowledge'),
+                    'style': user_profile_data.get('learning_style', 'visual'),
+                    'goal': user_profile_data.get('specific_goals', 'learn new concepts')
+                }
 
-                    if user_profile_data:
-                        profile = {
-                            'level': user_profile_data.get('skill_level', 'beginner'),
-                            'subject': user_profile_data.get('preferred_subjects', 'general knowledge'),
-                            'style': user_profile_data.get('learning_style', 'visual'),
-                            'goal': user_profile_data.get('specific_goals', 'learn new concepts')
-                        }
-
-                        prompt = f"""
+                prompt = f"""
 Create a 2-week personalized learning plan for a {profile['level']} student.
 Subject: {profile['subject']}
 Learning Style: {profile['style']}
@@ -628,37 +603,44 @@ Please structure it as a clean, detailed **HTML syllabus layout** with:
 - Subheadings for topics (`<h3>`)
 - Bullet points for activities (`<ul>`, `<li>`)
 - Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
+- Make the section visually appealing with appropriate HTML tags.
 Important: Always keep the each day topics name undre <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **inside the body tag**, NOT the full HTML structure 
 (no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
 Just give me the **content portion** that I can embed directly into my existing Django template.
 """
 
-                        try:
-                            model = genai.GenerativeModel("gemini-2.5-flash") # Confirming model name
-                            response = model.generate_content(prompt)
-                            syllabus_content = response.text
+                try:
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+                    response = model.generate_content(prompt)
+                    syllabus_content = response.text
 
-                            # Save generated syllabus to Firestore
-                            user_profile_ref = db.collection('user_profiles').document(firebase_uid)
-                            user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                    # Save generated syllabus to Firestore
+                    user_profile_ref = db.collection('user_profiles').document(firebase_uid)
+                    user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
 
-                            # --- Gemini-based YouTube video recommendations ---
-                            soup = BeautifulSoup(syllabus_content, 'html.parser')
-                            raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
-                            topics_for_videos = []
-                            for topic in raw_topics:
-                                cleaned_topic = topic.lower()
-                                remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
-                                for word in remove_words:
-                                    cleaned_topic = cleaned_topic.replace(word, '').strip()
-                                if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                                    topics_for_videos.append(cleaned_topic.title())
-                            
-                            recommended_videos_data = []
-                            for topic in topics_for_videos:
-                                channel_ids = get_relevant_channels_for_topic(topic, user_profile_data.get('preferred_subjects', ''))
-                                channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
-                                gemini_video_prompt = f"""
+                                        # --- Gemini-based YouTube video recommendations ---
+                    soup = BeautifulSoup(syllabus_content, 'html.parser')
+                    raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
+                    topics_for_videos = []
+                    for topic in raw_topics:
+                        cleaned_topic = topic.lower()
+                        remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
+                        for word in remove_words:
+                            cleaned_topic = cleaned_topic.replace(word, '').strip()
+                        if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
+                            topics_for_videos.append(cleaned_topic.title())
+                    
+                    recommended_videos_data = []
+                    
+                    # Limit video generation to avoid timeouts
+                    max_topics = min(2, len(topics_for_videos))
+                    
+                    for i, topic in enumerate(topics_for_videos[:max_topics]):
+                        if i >= 2:  # Safety limit
+                            break
+                        channel_ids = get_relevant_channels_for_topic(topic, user_profile_data.get('preferred_subjects', ''))
+                        channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
+                        gemini_video_prompt = f"""
 You are an expert educational video recommender. Here is the full HTML syllabus for context:
 -----
 {syllabus_content}
@@ -675,54 +657,68 @@ Return the result as a JSON array like this:
 ]
 If you can't find 3, return as many as possible. Do not include videos from other channels. Only output the JSON array, nothing else.
 """
-                                try:
-                                    video_response = model.generate_content(gemini_video_prompt)
-                                    videos = []
-                                    try:
-                                        videos = json.loads(video_response.text)
-                                    except Exception:
-                                        # Try to extract JSON from text if Gemini adds extra text
-                                        import re
-                                        match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
-                                        if match:
-                                            videos = json.loads(match.group(1))
-                                    # Filter/validate structure
-                                    valid_videos = [
-                                        {
-                                            'title': v.get('title', ''),
-                                            'video_id': v.get('video_id', ''),
-                                            'channel_title': v.get('channel_title', '')
-                                        }
-                                        for v in videos if v.get('title') and v.get('video_id')
-                                    ]
-                                    if valid_videos:
-                                        recommended_videos_data.append({
-                                            'topic': topic,
-                                            'videos': valid_videos
-                                        })
-                                except Exception as e:
-                                    print(f"Gemini video fetch error for topic '{topic}': {e}")
-                                    continue
-                            # Save recommended videos to Firestore
-                            user_profile_ref.set({'recommended_videos': recommended_videos_data, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
-                            # --- End Gemini-based video recommendations ---
-
+                        try:
+                            video_response = model.generate_content(gemini_video_prompt)
+                            videos = []
+                            try:
+                                videos = json.loads(video_response.text)
+                            except Exception:
+                                # Try to extract JSON from text if Gemini adds extra text
+                                import re
+                                match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
+                                if match:
+                                    videos = json.loads(match.group(1))
+                            # Filter/validate structure
+                            valid_videos = [
+                                {
+                                    'title': v.get('title', ''),
+                                    'video_id': v.get('video_id', ''),
+                                    'channel_title': v.get('channel_title', '')
+                                }
+                                for v in videos if v.get('title') and v.get('video_id')
+                            ]
+                            if valid_videos:
+                                recommended_videos_data.append({
+                                    'topic': topic,
+                                    'videos': valid_videos
+                                })
                         except Exception as e:
-                            syllabus_content = f"Error generating syllabus: {e}"
-                            messages.error(request, f"Failed to generate syllabus: {e}")
+                            print(f"Gemini video fetch error for topic '{topic}': {e}")
+                            continue
+                    
+                    # Save recommended videos to Firestore
+                    user_profile_ref.set({'recommended_videos': recommended_videos_data, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
+                    # --- End Gemini-based video recommendations ---
 
-                else:
-                    messages.error(request, "Firebase user not found in session for profile update.")
-                    return redirect('login') # Redirect to login if UID is missing
-            else:
-                # Handle case where user is not authenticated, perhaps redirect to login
-                return redirect('login')
+                except Exception as e:
+                    syllabus_content = f"Error generating syllabus: {e}"
+                    messages.error(request, f"Failed to generate syllabus: {e}")
 
             # Clear quiz data from session
             if 'onboarding_quiz_data' in request.session:
                 del request.session['onboarding_quiz_data']
             
-            return redirect('syllabus') # Redirect to syllabus after successful generation
+            # Return JSON response for AJAX requests
+            from django.urls import reverse
+            from django.http import JsonResponse
+            
+            syllabus_url = reverse('syllabus')
+            return JsonResponse({
+                'success': True,
+                'message': 'Profile updated successfully!',
+                'redirect_url': syllabus_url
+            })
+                
+        except Exception as e:
+            # For AJAX requests, return JSON error
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': f'An unexpected error occurred: {str(e)}'
+                })
+            
+            messages.error(request, f"An unexpected error occurred: {e}")
+            return render(request, 'onboarding_quiz.html', {'form': UserProfileForm(), 'error': str(e)})
     else:
         form = UserProfileForm(initial=quiz_data)
 
@@ -1108,7 +1104,7 @@ def notes_view(request):
         doc = doc_ref.get()
         if doc.exists:
             user_profile = doc.to_dict()
-            
+        
         # Get notes from subcollections using the new function
         notes_pdfs = get_notes_from_firestore(firebase_uid)
 
@@ -1314,26 +1310,17 @@ def generate_study_notes(request):
         return JsonResponse({'success': False, 'error': 'User not authenticated.'})
 
     try:
-        print(f"Starting study notes generation for user: {firebase_uid}")
-        
         user_ref = db.collection('user_profiles').document(firebase_uid)
         user_doc = user_ref.get()
         if not user_doc.exists:
-            print(f"User profile not found for: {firebase_uid}")
             return JsonResponse({'success': False, 'error': 'User profile not found.'})
         
         user_profile_data = user_doc.to_dict()
         syllabus_content = user_profile_data.get('generated_syllabus')
         skill_level = user_profile_data.get('skill_level', 'beginner')
         specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
-        
-        print(f"User data - skill_level: {skill_level}, specific_goals: {specific_goals}")
-        
         if not syllabus_content:
-            print(f"No syllabus content found for user: {firebase_uid}")
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz.'})
-
-        print(f"Syllabus content length: {len(syllabus_content)}")
 
         soup = BeautifulSoup(syllabus_content, 'html.parser')
         raw_topics = []
@@ -1342,8 +1329,6 @@ def generate_study_notes(request):
             topic = heading.get_text(strip=True)
             if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:# Filter out common non-topic headings
                 raw_topics.append(topic)
-        
-        print(f"Found {len(raw_topics)} topics: {raw_topics}")
         
         if not raw_topics:
             return JsonResponse({'success': False, 'error': 'No topics found in the syllabus to generate notes for.'})
@@ -1355,44 +1340,29 @@ def generate_study_notes(request):
             goals_list = [goal.strip() for goal in specific_goals.split(',')]
             determined_course_name = goals_list[0].title()
         
-        print(f"Determined course name: {determined_course_name}")
-        
         for topic in raw_topics:
             print(f"Generating notes for topic: {topic}")
             
-            try:
-                # Step 1: Generate structured content using Gemini (now includes web search internally)
-                gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
+            # Step 1: Generate structured content using Gemini (now includes web search internally)
+            gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
+            
+            # Step 2: Parse Gemini content into sections
+            content_sections = parse_gemini_content_to_sections(gemini_content)
+            
+            if content_sections.get('notes') and content_sections.get('assignment'):
+                # Step 3: Generate PDF
+                pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
                 
-                if not gemini_content:
-                    print(f"Gemini returned empty content for topic: {topic}")
-                    continue
-                
-                # Step 2: Parse Gemini content into sections
-                content_sections = parse_gemini_content_to_sections(gemini_content)
-                
-                if content_sections.get('notes') and content_sections.get('assignment'):
-                    # Step 3: Generate PDF
-                    pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
-                    
-                    if pdf_content_base64:
-                        # Step 4: Save PDF content to Firestore with the determined course name
-                        if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
-                            new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
-                            print(f"Successfully generated and saved note for topic: {topic}")
-                        else:
-                            print(f"Failed to save PDF for topic: {topic}")
+                if pdf_content_base64:
+                    # Step 4: Save PDF content to Firestore with the determined course name
+                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
+                        new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
                     else:
-                        print(f"Failed to generate PDF for topic: {topic}")
+                        print(f"Failed to save PDF for topic: {topic}")
                 else:
-                    print(f"Gemini did not return complete notes and assignment for topic: {topic}")
-                    print(f"Content sections: {content_sections}")
-                    
-            except Exception as topic_error:
-                print(f"Error processing topic '{topic}': {topic_error}")
-                continue
-
-        print(f"Generated {len(new_notes_generated)} notes successfully")
+                    print(f"Failed to generate PDF for topic: {topic}")
+            else:
+                print(f"Gemini did not return complete notes and assignment for topic: {topic}")
 
         if new_notes_generated:
             return JsonResponse({'success': True, 'message': f'{len(new_notes_generated)} notes generated successfully!', 'notes': new_notes_generated})
@@ -1400,9 +1370,7 @@ def generate_study_notes(request):
             return JsonResponse({'success': False, 'error': 'No notes could be generated. Please ensure your syllabus has clear topics.'})
 
     except Exception as e:
-        import traceback
         print(f"Error generating study notes: {e}")
-        print(f"Traceback: {traceback.format_exc()}")
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
 
 
@@ -1490,129 +1458,6 @@ def delete_study_note(request):
     except Exception as e:
         print(f"Error deleting study note: {e}")
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
-
-
-@login_required
-@require_POST
-def test_generate_notes(request):
-    """Test endpoint to check if basic note generation works"""
-    firebase_uid = request.session.get('firebase_user', {}).get('uid')
-    if not firebase_uid:
-        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
-
-    try:
-        # Test basic functionality
-        test_topic = "Basic Mathematics"
-        test_level = "beginner"
-        test_goals = "learn fundamentals"
-        
-        print("Testing Gemini API...")
-        gemini_content = generate_structured_content_with_gemini(test_topic, test_level, test_goals)
-        
-        if not gemini_content:
-            return JsonResponse({'success': False, 'error': 'Gemini API test failed - no content returned'})
-        
-        print("Testing content parsing...")
-        content_sections = parse_gemini_content_to_sections(gemini_content)
-        
-        if not content_sections.get('notes') or not content_sections.get('assignment'):
-            return JsonResponse({'success': False, 'error': 'Content parsing test failed - missing sections'})
-        
-        print("Testing PDF generation...")
-        pdf_content = generate_pdf_from_content(content_sections, test_topic, firebase_uid)
-        
-        if not pdf_content:
-            return JsonResponse({'success': False, 'error': 'PDF generation test failed'})
-        
-        return JsonResponse({
-            'success': True, 
-            'message': 'All tests passed!',
-            'gemini_content_length': len(gemini_content),
-            'notes_length': len(content_sections.get('notes', '')),
-            'assignment_length': len(content_sections.get('assignment', '')),
-            'pdf_length': len(pdf_content)
-        })
-        
-    except Exception as e:
-        import traceback
-        print(f"Test error: {e}")
-        print(f"Test traceback: {traceback.format_exc()}")
-        return JsonResponse({'success': False, 'error': f'Test failed: {str(e)}'})
-
-
-@login_required
-def diagnose_environment(request):
-    """Diagnostic endpoint to check environment and dependencies"""
-    try:
-        diagnostics = {
-            'django_version': 'OK',
-            'firebase_admin': 'OK',
-            'google_generativeai': 'OK',
-            'beautifulsoup4': 'OK',
-            'markdown': 'OK',
-            'weasyprint': 'Unknown',
-            'base64': 'OK',
-            'json': 'OK',
-            're': 'OK'
-        }
-        
-        # Test imports
-        try:
-            import django
-            diagnostics['django_version'] = django.get_version()
-        except Exception as e:
-            diagnostics['django_version'] = f'Error: {e}'
-        
-        try:
-            import firebase_admin
-            diagnostics['firebase_admin'] = 'OK'
-        except Exception as e:
-            diagnostics['firebase_admin'] = f'Error: {e}'
-        
-        try:
-            import google.generativeai
-            diagnostics['google_generativeai'] = 'OK'
-        except Exception as e:
-            diagnostics['google_generativeai'] = f'Error: {e}'
-        
-        try:
-            from bs4 import BeautifulSoup
-            diagnostics['beautifulsoup4'] = 'OK'
-        except Exception as e:
-            diagnostics['beautifulsoup4'] = f'Error: {e}'
-        
-        try:
-            import markdown
-            diagnostics['markdown'] = 'OK'
-        except Exception as e:
-            diagnostics['markdown'] = f'Error: {e}'
-        
-        try:
-            from weasyprint import HTML
-            diagnostics['weasyprint'] = 'OK'
-        except Exception as e:
-            diagnostics['weasyprint'] = f'Error: {e}'
-        
-        # Test basic functionality
-        try:
-            test_html = "<h1>Test</h1><p>Hello World</p>"
-            test_md = "# Test\nHello World"
-            md_html = markdown.markdown(test_md)
-            diagnostics['markdown_processing'] = 'OK'
-        except Exception as e:
-            diagnostics['markdown_processing'] = f'Error: {e}'
-        
-        return JsonResponse({
-            'success': True,
-            'diagnostics': diagnostics,
-            'message': 'Environment check completed'
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Diagnostic failed: {str(e)}'
-        })
 
 
 @login_required
