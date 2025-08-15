@@ -477,251 +477,119 @@ def signup_view(request):
         form = SignupForm()
     return render(request, 'signup.html', {'form': form})
 
+
+
 @csrf_exempt
 def onboarding_quiz_view(request):
-    # Using session to store quiz data across steps
+    """Simplified onboarding quiz view with better error handling"""
     quiz_data = request.session.get('onboarding_quiz_data', {})
 
     if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
         try:
-            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
             print(f"DEBUG: Processing {'AJAX' if is_ajax else 'regular'} request")
-            print(f"DEBUG: POST data: {dict(request.POST)}")
             
-            # Create and validate form
+            # Validate form
             form = UserProfileForm(request.POST, initial=quiz_data)
-            print(f"DEBUG: Form is valid: {form.is_valid()}")
             if not form.is_valid():
-                print(f"DEBUG: Form errors: {form.errors}")
-            
-            if form.is_valid():
-                # Update quiz data with form data
-                for key, value in form.cleaned_data.items():
-                    quiz_data[key] = value
-                
-                request.session['onboarding_quiz_data'] = quiz_data
-
-                # Check authentication
-                if not request.user.is_authenticated:
-                    if is_ajax:
-                        return JsonResponse({
-                            'success': False,
-                            'error': 'User not authenticated. Please log in.'
-                        })
-                    return redirect('login')
-                
-                firebase_uid = request.session.get('firebase_user', {}).get('uid')
-                
-                if not firebase_uid:
-                    error_msg = "Firebase user not found in session for profile update."
-                    if is_ajax:
-                        return JsonResponse({
-                            'success': False,
-                            'error': error_msg
-                        })
-                    messages.error(request, error_msg)
-                    return redirect('login')
-                
-                # Save to Firebase Firestore
-                try:
-                    print(f"DEBUG: Saving to Firebase for user: {firebase_uid}")
-                    doc_ref = db.collection('user_profiles').document(firebase_uid)
-                    doc_ref.set({
-                        'learning_style': quiz_data.get('learning_style'),
-                        'preferred_subjects': quiz_data.get('preferred_subjects'),
-                        'skill_level': quiz_data.get('skill_level'),
-                        'specific_goals': quiz_data.get('specific_goals'),
-                        'last_updated': firestore.SERVER_TIMESTAMP
-                    }, merge=True)
-                    print(f"DEBUG: Successfully saved to Firebase")
-                except Exception as firebase_error:
-                    print(f"DEBUG: Firebase error: {firebase_error}")
-                    error_msg = f"Failed to save profile: {firebase_error}"
-                    if is_ajax:
-                        return JsonResponse({
-                            'success': False,
-                            'error': error_msg
-                        })
-                    messages.error(request, error_msg)
-                    return render(request, 'onboarding_quiz.html', {'form': form, 'error': str(firebase_error)})
-            else:
-                # Form validation failed
+                print(f"DEBUG: Form validation failed: {form.errors}")
                 if is_ajax:
                     return JsonResponse({
                         'success': False,
-                        'error': 'Please fill in all required fields correctly.'
+                        'error': 'Please fill in all required fields correctly.',
+                        'form_errors': form.errors
                     })
                 return render(request, 'onboarding_quiz.html', {'form': form, 'form_errors': form.errors})
-
-            # Generate and save syllabus after profile update
-            user_profile_data = quiz_data
-            syllabus_content = "No syllabus generated. Please complete your profile and try again."
-
-            if user_profile_data:
-                profile = {
-                    'level': user_profile_data.get('skill_level', 'beginner'),
-                    'subject': user_profile_data.get('preferred_subjects', 'general knowledge'),
-                    'style': user_profile_data.get('learning_style', 'visual'),
-                    'goal': user_profile_data.get('specific_goals', 'learn new concepts')
-                }
-
-            # Generate and save syllabus after profile update
-            user_profile_data = quiz_data
-            syllabus_content = "No syllabus generated. Please complete your profile and try again."
-
-            if user_profile_data:
-                profile = {
-                    'level': user_profile_data.get('skill_level', 'beginner'),
-                    'subject': user_profile_data.get('preferred_subjects', 'general knowledge'),
-                    'style': user_profile_data.get('learning_style', 'visual'),
-                    'goal': user_profile_data.get('specific_goals', 'learn new concepts')
-                }
-
-                prompt = f"""
-Create a 2-week personalized learning plan for a {profile['level']} student.
-Subject: {profile['subject']}
-Learning Style: {profile['style']}
-Goal: {profile['goal']}
-Please structure it as a clean, detailed **HTML syllabus layout** with:
-- Clear headings for weeks (`<h2>`)
-- Subheadings for topics (`<h3>`)
-- Bullet points for activities (`<ul>`, `<li>`)
-- Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
-- Make the section visually appealing with appropriate HTML tags.
-Important: Always keep the each day topics name under <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
-(no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
-Just give me the **content portion** that I can embed directly into my existing Django template.
-"""
-
-                try:
-                    print(f"DEBUG: Generating syllabus with Gemini")
-                    model = genai.GenerativeModel("gemini-2.5-flash")
-                    response = model.generate_content(prompt)
-                    syllabus_content = response.text
-                    print(f"DEBUG: Syllabus generated successfully")
-
-                    # Save generated syllabus to Firestore
-                    user_profile_ref = db.collection('user_profiles').document(firebase_uid)
-                    user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
-                    print(f"DEBUG: Syllabus saved to Firebase")
-
-                    # --- Gemini-based YouTube video recommendations ---
-                    try:
-                        print(f"DEBUG: Starting video recommendations")
-                        soup = BeautifulSoup(syllabus_content, 'html.parser')
-                        raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
-                        topics_for_videos = []
-                        for topic in raw_topics:
-                            cleaned_topic = topic.lower()
-                            remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
-                            for word in remove_words:
-                                cleaned_topic = cleaned_topic.replace(word, '').strip()
-                            if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                                topics_for_videos.append(cleaned_topic.title())
-                        
-                        print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
-                        recommended_videos_data = []
-                        
-                        # Limit to first 5 topics to avoid timeout
-                        for i, topic in enumerate(topics_for_videos[:5]):
-                            try:
-                                channel_ids = get_relevant_channels_for_topic(topic, user_profile_data.get('preferred_subjects', ''))
-                                channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
-                                gemini_video_prompt = f"""
-For the topic: '{topic}', recommend up to 2 highly relevant YouTube videos from these channels: {channel_id_str}.
-Return only a JSON array:
-[
-  {{"title": "...", "video_id": "...", "channel_title": "..."}},
-  ...
-]
-"""
-                                video_response = model.generate_content(gemini_video_prompt)
-                                videos = []
-                                try:
-                                    videos = json.loads(video_response.text)
-                                except Exception:
-                                    # Try to extract JSON from text if Gemini adds extra text
-                                    match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
-                                    if match:
-                                        videos = json.loads(match.group(1))
-                                
-                                # Filter/validate structure
-                                valid_videos = [
-                                    {
-                                        'title': v.get('title', ''),
-                                        'video_id': v.get('video_id', ''),
-                                        'channel_title': v.get('channel_title', '')
-                                    }
-                                    for v in videos if v.get('title') and v.get('video_id')
-                                ]
-                                
-                                if valid_videos:
-                                    recommended_videos_data.append({
-                                        'topic': topic,
-                                        'videos': valid_videos
-                                    })
-                                    
-                            except Exception as e:
-                                print(f"DEBUG: Video fetch error for topic '{topic}': {e}")
-                                continue
-                        
-                        # Save recommended videos to Firestore
-                        if recommended_videos_data:
-                            user_profile_ref.set({'recommended_videos': recommended_videos_data, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
-                            print(f"DEBUG: Saved {len(recommended_videos_data)} video topics")
-                        
-                    except Exception as video_error:
-                        print(f"DEBUG: Video generation failed completely: {video_error}")
-                        # Continue without videos
-                    # --- End Gemini-based video recommendations ---
-
-                except Exception as e:
-                    print(f"DEBUG: Error generating syllabus: {e}")
-                    # Don't fail the entire process if syllabus generation fails
-                    # Just continue without syllabus and videos
-                    syllabus_content = f"<h2>Welcome to your learning journey!</h2><p>Your profile has been saved successfully. We'll generate your personalized syllabus shortly.</p>"
-                    
-                    # Save a basic syllabus to Firebase
-                    try:
-                        user_profile_ref = db.collection('user_profiles').document(firebase_uid)
-                        user_profile_ref.set({'generated_syllabus': syllabus_content, 'last_updated': firestore.SERVER_TIMESTAMP}, merge=True)
-                    except Exception as fb_error:
-                        print(f"DEBUG: Failed to save basic syllabus: {fb_error}")
-                    
-                    print(f"DEBUG: Continuing with basic syllabus due to generation error")
-
-            # Clear quiz data from session
+            
+            # Update quiz data
+            for key, value in form.cleaned_data.items():
+                quiz_data[key] = value
+            request.session['onboarding_quiz_data'] = quiz_data
+            
+            # Check authentication
+            if not request.user.is_authenticated:
+                error_msg = 'User not authenticated. Please log in.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': error_msg})
+                return redirect('login')
+            
+            firebase_uid = request.session.get('firebase_user', {}).get('uid')
+            if not firebase_uid:
+                error_msg = "Firebase user not found in session."
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': error_msg})
+                messages.error(request, error_msg)
+                return redirect('login')
+            
+            # Save basic profile to Firebase (without syllabus generation for now)
+            try:
+                print(f"DEBUG: Saving profile to Firebase for user: {firebase_uid}")
+                doc_ref = db.collection('user_profiles').document(firebase_uid)
+                doc_ref.set({
+                    'learning_style': quiz_data.get('learning_style'),
+                    'preferred_subjects': quiz_data.get('preferred_subjects'),
+                    'skill_level': quiz_data.get('skill_level'),
+                    'specific_goals': quiz_data.get('specific_goals'),
+                    'last_updated': firestore.SERVER_TIMESTAMP
+                }, merge=True)
+                print(f"DEBUG: Profile saved successfully")
+                
+                # Save a basic syllabus for now
+                basic_syllabus = f"""
+                <h2>Welcome to your learning journey!</h2>
+                <p>Your profile has been saved successfully.</p>
+                <h3>Your Learning Preferences:</h3>
+                <ul>
+                    <li><strong>Learning Style:</strong> {quiz_data.get('learning_style', 'Not specified')}</li>
+                    <li><strong>Preferred Subjects:</strong> {quiz_data.get('preferred_subjects', 'Not specified')}</li>
+                    <li><strong>Skill Level:</strong> {quiz_data.get('skill_level', 'Not specified')}</li>
+                    <li><strong>Goals:</strong> {quiz_data.get('specific_goals', 'Not specified')}</li>
+                </ul>
+                <p>We'll generate your personalized syllabus and video recommendations shortly.</p>
+                """
+                
+                doc_ref.set({
+                    'generated_syllabus': basic_syllabus,
+                    'last_updated': firestore.SERVER_TIMESTAMP
+                }, merge=True)
+                
+            except Exception as firebase_error:
+                print(f"DEBUG: Firebase error: {firebase_error}")
+                error_msg = f"Failed to save profile: {str(firebase_error)}"
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': error_msg})
+                messages.error(request, error_msg)
+                return render(request, 'onboarding_quiz.html', {'form': form, 'error': error_msg})
+            
+            # Clear session data
             if 'onboarding_quiz_data' in request.session:
                 del request.session['onboarding_quiz_data']
             
-            # Return JSON response for AJAX requests
+            # Return success response
             if is_ajax:
-                syllabus_url = reverse('syllabus')
                 return JsonResponse({
                     'success': True,
                     'message': 'Profile updated successfully!',
-                    'redirect_url': syllabus_url
+                    'redirect_url': reverse('syllabus')
                 })
             else:
                 return redirect('syllabus')
                 
         except Exception as e:
-            print(f"DEBUG: Unexpected error in onboarding_quiz_view: {e}")
+            print(f"DEBUG: Unexpected error: {e}")
             import traceback
             traceback.print_exc()
             
-            # For AJAX requests, return JSON error
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'error': f'An unexpected error occurred: {str(e)}'
-                })
+            error_msg = f'An unexpected error occurred: {str(e)}'
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': error_msg})
             
-            messages.error(request, f"An unexpected error occurred: {e}")
-            return render(request, 'onboarding_quiz.html', {'form': UserProfileForm(), 'error': str(e)})
-    else:
-        form = UserProfileForm(initial=quiz_data)
-
+            messages.error(request, error_msg)
+            return render(request, 'onboarding_quiz.html', {'form': UserProfileForm(), 'error': error_msg})
+    
+    # GET request
+    form = UserProfileForm(initial=quiz_data)
     return render(request, 'onboarding_quiz.html', {'form': form})
 
 @login_required
