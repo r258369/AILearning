@@ -222,7 +222,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 'X-CSRFToken': csrfToken
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            // Check if response is ok and content-type is JSON
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // If not JSON, get text to see what the server returned
+                return response.text().then(text => {
+                    console.error('Server returned non-JSON response:', text);
+                    throw new Error('Server returned an error page instead of JSON');
+                });
+            }
+        })
         .then(data => {
             if (data.success && data.redirect_url) {
                 // Success - redirect to syllabus
