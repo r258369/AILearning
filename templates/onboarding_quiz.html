@@ -211,11 +211,15 @@ document.addEventListener('DOMContentLoaded', function () {
         // Submit form via fetch to handle JSON response
         const formData = new FormData(form);
         
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
         fetch(window.location.href, {
             method: 'POST',
             body: formData,
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken
             }
         })
         .then(response => response.json())
@@ -225,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.location.href = data.redirect_url;
             } else {
                 // Error - show error message
-                alert(data.message || 'An error occurred');
+                alert(data.error || data.message || 'An error occurred');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit';
                 loader.style.display = 'none';
