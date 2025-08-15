@@ -151,9 +151,40 @@
             {{ form.specific_goals }}
         </div>
 
-        <button type="submit" class="btn">Submit</button>
+        <button type="submit" class="btn" id="submit-btn">Submit</button>
     </form>
+    
+    {% if form_errors %}
+    <div class="error-messages" style="margin-top: 20px; padding: 15px; background-color: #fee; border: 1px solid #fcc; border-radius: 5px; color: #c33;">
+        <h4>Please fix the following errors:</h4>
+        <ul>
+        {% for field, errors in form_errors.items %}
+            {% for error in errors %}
+                <li><strong>{{ field }}:</strong> {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    {% if error %}
+    <div class="error-messages" style="margin-top: 20px; padding: 15px; background-color: #fee; border: 1px solid #fcc; border-radius: 5px; color: #c33;">
+        <h4>Error:</h4>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+    
+    {% if success_message %}
+    <div class="success-message" style="margin-top: 20px; padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724;">
+        <h4>Success!</h4>
+        <p>{{ success_message }}</p>
+    </div>
+    {% endif %}
 </div>
+
+{% if redirect_script %}
+    {{ redirect_script|safe }}
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -162,11 +193,52 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('quiz-form');
     const loader = document.getElementById('custom-loader-wrapper');
     const content = document.getElementById('quiz-content');
+    const submitBtn = document.getElementById('submit-btn');
 
-    form.addEventListener('submit', function () {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault(); // Prevent default form submission
+        
+        // Prevent multiple submissions
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        
+        // Show loader
         requestAnimationFrame(() => {
             loader.style.display = 'flex';
             content.style.display = 'none';
+        });
+        
+        // Submit form via fetch to handle JSON response
+        const formData = new FormData(form);
+        
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.redirect_url) {
+                // Success - redirect to syllabus
+                window.location.href = data.redirect_url;
+            } else {
+                // Error - show error message
+                alert(data.message || 'An error occurred');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+                loader.style.display = 'none';
+                content.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+            loader.style.display = 'none';
+            content.style.display = 'block';
         });
     });
 });
