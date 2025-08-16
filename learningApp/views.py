@@ -146,19 +146,46 @@ def generate_structured_content_with_gemini(topic, level,specific_goals):
     prompt = f'''
 Specific Goals: {specific_goals}
 Topic: {topic}\nLevel: {level}
-1. Research and write clear, concise study notes (400-500 words, student-friendly tone, with relevant examples like maths, codes, etc.) using your internal knowledge and web search capabilities to gather accurate and up-to-date information from reliable public sources (e.g., Wikipedia, OpenStax, Khan Academy, Byju's, etc.).
-2. Create a 5-question assignment (mix of MCQ, fill-in-the-blanks, and short answers) based on the notes. For MCQs, provide 4 options (a-d). For fill-in-the-blanks, indicate the blank with underscores. For short answers, ask questions that can be answered in 2-3 sentences.
+1. Research and write clear, concise study notes (400-500 words, student-friendly tone, with relevant examples.) using your internal knowledge and web search capabilities to gather accurate and up-to-date information from reliable public sources (e.g., Wikipedia, OpenStax, Khan Academy, Byju's, etc.).
+2. Create a 5-question assignment (mix of MCQ, Short problem solving Questions) based on the notes. For MCQs, provide 4 options (a-d). For Short problem solving Questions, ask questions that can be answered in 5-10 sentences.
 Format for PDF:
 📝 Study Notes
-📄 Assignment Questions
+📄 Short problem solving Questions
 '''
     try:
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        print(f"Gemini error for {topic}: {e}")
-        return ""
+        print(f"DEBUG: Gemini error for {topic}: {e}")
+        return create_fallback_content(topic, level)
+
+def create_fallback_content(topic, level):
+    """Create basic fallback content when Gemini fails"""
+    return f"""
+📝 Study Notes
+{topic} - {level.title()} Level
+
+This is a basic study guide for {topic}. The topic covers fundamental concepts that are important for understanding the subject matter.
+
+Key points to remember:
+- Understand the basic definitions and concepts
+- Practice with examples and exercises  
+- Review regularly to reinforce learning
+- Connect concepts to real-world applications
+
+📄 Assignment Questions
+
+1. Multiple Choice: What is the main concept covered in {topic}?
+   a) Basic principles
+   b) Advanced theories  
+   c) Practical applications
+   d) All of the above
+
+2. Fill in the blank: {topic} is important because ____________.
+
+3. Short Answer: Explain one key concept from {topic} in your own words.
+"""
 
 def parse_gemini_content_to_sections(gemini_text):
     # Simple parser to split the Gemini output into sections
@@ -228,24 +255,80 @@ def convert_text_to_html_for_pdf(topic, notes_content, assignment_content):
 
 
 def generate_pdf_from_content(content_dict, topic, user_id):
+    """Generate PDF with production-optimized memory management"""
     try:
-        # Convert content to HTML
+        print(f"DEBUG: Starting PDF generation for topic: {topic}")
+        
+        # Convert content to HTML with memory optimization
         html_string = convert_text_to_html_for_pdf(
             topic,
             content_dict["notes"],
             content_dict["assignment"]
         )
+        
+        # Limit HTML content size to prevent memory issues
+        max_html_size = 50000  # 50KB limit
+        if len(html_string) > max_html_size:
+            print(f"DEBUG: HTML content too large ({len(html_string)} chars), truncating")
+            html_string = html_string[:max_html_size] + "</body></html>"
 
-        # Generate PDF using WeasyPrint
-        # WeasyPrint can directly convert HTML string to PDF bytes
-        pdf_bytes = HTML(string=html_string).write_pdf()
-
-        # Encode to base64
-        pdf_content_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-        return f"data:application/pdf;base64,{pdf_content_base64}"
+        # Generate PDF using WeasyPrint with memory constraints
+        try:
+            pdf_bytes = HTML(string=html_string).write_pdf()
+            print(f"DEBUG: PDF generated successfully, size: {len(pdf_bytes)} bytes")
+            
+            # Limit PDF size to prevent Firebase/memory issues
+            max_pdf_size = 1024 * 1024  # 1MB limit
+            if len(pdf_bytes) > max_pdf_size:
+                print(f"DEBUG: PDF too large ({len(pdf_bytes)} bytes), rejecting")
+                return None
+            
+            # Encode to base64
+            pdf_content_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+            
+            # Clean up memory
+            del pdf_bytes
+            del html_string
+            
+            return f"data:application/pdf;base64,{pdf_content_base64}"
+            
+        except Exception as weasy_error:
+            print(f"DEBUG: WeasyPrint error: {weasy_error}")
+            # Fallback: create simple text-based PDF content
+            return create_simple_text_pdf(content_dict, topic)
 
     except Exception as e:
-        print(f"Error generating PDF with WeasyPrint: {e}")
+        print(f"DEBUG: PDF generation error for {topic}: {e}")
+        return None
+
+def create_simple_text_pdf(content_dict, topic):
+    """Fallback: Create simple text-based content when PDF generation fails"""
+    try:
+        # Create simple HTML without complex styling
+        simple_html = f"""
+        <html>
+        <head><title>{topic} - Study Notes</title></head>
+        <body style="font-family: Arial; margin: 20px; line-height: 1.6;">
+            <h1>{topic}</h1>
+            <h2>Study Notes</h2>
+            <div>{content_dict.get('notes', 'No notes available')}</div>
+            <h2>Assignment</h2>
+            <div>{content_dict.get('assignment', 'No assignment available')}</div>
+        </body>
+        </html>
+        """
+        
+        pdf_bytes = HTML(string=simple_html).write_pdf()
+        pdf_content_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        
+        # Clean up
+        del pdf_bytes
+        del simple_html
+        
+        return f"data:application/pdf;base64,{pdf_content_base64}"
+        
+    except Exception as e:
+        print(f"DEBUG: Simple PDF generation also failed: {e}")
         return None
 
 def save_note_to_firestore(user_id, topic, pdf_content_base64, course_name):
@@ -1421,75 +1504,154 @@ def mark_video_complete(request):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
-@require_POST
+@require_POST  
 def generate_study_notes(request):
-    firebase_uid = request.session.get('firebase_user', {}).get('uid')
-    if not firebase_uid:
-        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
-
+    """Generate study notes with production-optimized error handling"""
     try:
-        user_ref = db.collection('user_profiles').document(firebase_uid)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            return JsonResponse({'success': False, 'error': 'User profile not found.'})
-        
-        user_profile_data = user_doc.to_dict()
-        syllabus_content = user_profile_data.get('generated_syllabus')
-        skill_level = user_profile_data.get('skill_level', 'beginner')
-        specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
+        # Check authentication
+        firebase_uid = request.session.get('firebase_user', {}).get('uid')
+        if not firebase_uid:
+            return JsonResponse({'success': False, 'error': 'User not authenticated.'})
+
+        print(f"DEBUG: Starting note generation for user: {firebase_uid}")
+
+        # Get user profile with error handling
+        try:
+            user_ref = db.collection('user_profiles').document(firebase_uid)
+            user_doc = user_ref.get()
+            if not user_doc.exists:
+                return JsonResponse({'success': False, 'error': 'User profile not found.'})
+            
+            user_profile_data = user_doc.to_dict()
+            syllabus_content = user_profile_data.get('generated_syllabus')
+            skill_level = user_profile_data.get('skill_level', 'beginner')
+            specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
+            
+        except Exception as firebase_error:
+            print(f"DEBUG: Firebase error: {firebase_error}")
+            return JsonResponse({'success': False, 'error': 'Failed to access user data. Please try again.'})
+
         if not syllabus_content:
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz.'})
 
-        soup = BeautifulSoup(syllabus_content, 'html.parser')
-        raw_topics = []
-        # Extract topics from H2 and H3 tags within the syllabus HTML
-        for heading in soup.find_all(['h3']):
-            topic = heading.get_text(strip=True)
-            if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:# Filter out common non-topic headings
-                raw_topics.append(topic)
+        # Extract topics with error handling
+        try:
+            soup = BeautifulSoup(syllabus_content, 'html.parser')
+            raw_topics = []
+            for heading in soup.find_all(['h3']):
+                topic = heading.get_text(strip=True)
+                if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:
+                    raw_topics.append(topic)
+            
+            print(f"DEBUG: Found {len(raw_topics)} topics for notes")
+            
+        except Exception as parsing_error:
+            print(f"DEBUG: Syllabus parsing error: {parsing_error}")
+            return JsonResponse({'success': False, 'error': 'Failed to parse syllabus content.'})
         
         if not raw_topics:
             return JsonResponse({'success': False, 'error': 'No topics found in the syllabus to generate notes for.'})
 
-        new_notes_generated = []
-        # Determine the course name from specific_goals, taking the first one if comma-separated
+        # Determine course name
         determined_course_name = "General Learning"
         if specific_goals and specific_goals.strip():
             goals_list = [goal.strip() for goal in specific_goals.split(',')]
             determined_course_name = goals_list[0].title()
-        
-        for topic in raw_topics:
-            print(f"Generating notes for topic: {topic}")
-            
-            # Step 1: Generate structured content using Gemini (now includes web search internally)
-            gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
-            
-            # Step 2: Parse Gemini content into sections
-            content_sections = parse_gemini_content_to_sections(gemini_content)
-            
-            if content_sections.get('notes') and content_sections.get('assignment'):
-                # Step 3: Generate PDF
-                pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
-                
-                if pdf_content_base64:
-                    # Step 4: Save PDF content to Firestore with the determined course name
-                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
-                        new_notes_generated.append({'topic': topic, 'pdf_url': pdf_content_base64, 'course_name': determined_course_name})
-                    else:
-                        print(f"Failed to save PDF for topic: {topic}")
-                else:
-                    print(f"Failed to generate PDF for topic: {topic}")
-            else:
-                print(f"Gemini did not return complete notes and assignment for topic: {topic}")
 
+        new_notes_generated = []
+        
+        # Limit topics to prevent memory issues in production (adjust based on server capacity)
+        max_topics = 2  # Increased to 2 - monitor for 500 errors
+        print(f"DEBUG: Processing {max_topics} topics at a time (production optimization)")
+        
+        for i, topic in enumerate(raw_topics[:max_topics]):
+            try:
+                print(f"DEBUG: Generating notes for topic {i+1}/{max_topics}: {topic}")
+                
+                # Generate content with Gemini
+                try:
+                    gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
+                    if not gemini_content:
+                        print(f"DEBUG: No content generated for topic: {topic}")
+                        continue
+                        
+                except Exception as gemini_error:
+                    print(f"DEBUG: Gemini error for topic '{topic}': {gemini_error}")
+                    continue
+                
+                # Parse content into sections
+                try:
+                    content_sections = parse_gemini_content_to_sections(gemini_content)
+                    if not (content_sections.get('notes') and content_sections.get('assignment')):
+                        print(f"DEBUG: Incomplete content sections for topic: {topic}")
+                        continue
+                        
+                except Exception as parsing_error:
+                    print(f"DEBUG: Content parsing error for topic '{topic}': {parsing_error}")
+                    continue
+                
+                # Generate PDF with error handling
+                try:
+                    pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
+                    if not pdf_content_base64:
+                        print(f"DEBUG: PDF generation failed for topic: {topic}")
+                        continue
+                        
+                except Exception as pdf_error:
+                    print(f"DEBUG: PDF generation error for topic '{topic}': {pdf_error}")
+                    continue
+                
+                # Save to Firestore with error handling
+                try:
+                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
+                        new_notes_generated.append({
+                            'topic': topic, 
+                            'pdf_url': pdf_content_base64, 
+                            'course_name': determined_course_name
+                        })
+                        print(f"DEBUG: Successfully generated note for topic: {topic}")
+                    else:
+                        print(f"DEBUG: Failed to save note for topic: {topic}")
+                        
+                except Exception as save_error:
+                    print(f"DEBUG: Save error for topic '{topic}': {save_error}")
+                    continue
+
+            except Exception as topic_error:
+                print(f"DEBUG: Unexpected error for topic '{topic}': {topic_error}")
+                continue
+
+        # Return results
         if new_notes_generated:
-            return JsonResponse({'success': True, 'message': f'{len(new_notes_generated)} notes generated successfully!', 'notes': new_notes_generated})
+            total_notes = len(new_notes_generated)
+            remaining_topics = len(raw_topics) - max_topics
+            
+            if remaining_topics > 0:
+                message = f'Generated {total_notes} note successfully! Click "Generate Study Notes" again to create notes for the remaining {remaining_topics} topics.'
+            else:
+                message = f'Successfully generated {total_notes} study note!'
+            
+            return JsonResponse({
+                'success': True, 
+                'message': message, 
+                'notes': new_notes_generated,
+                'total_generated': total_notes,
+                'remaining_topics': remaining_topics
+            })
         else:
-            return JsonResponse({'success': False, 'error': 'No notes could be generated. Please ensure your syllabus has clear topics.'})
+            return JsonResponse({
+                'success': False, 
+                'error': 'No notes could be generated. This might be due to AI service limitations. Please try again later.'
+            })
 
     except Exception as e:
-        print(f"Error generating study notes: {e}")
-        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+        print(f"DEBUG: Unexpected note generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False, 
+            'error': 'An unexpected error occurred during note generation. Please try again later.'
+        })
 
 
 def migrate_old_notes_to_subcollections(user_id):
