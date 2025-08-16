@@ -646,95 +646,114 @@ Just give me the **content portion** that I can embed directly into my existing 
 @require_POST
 def generate_videos_view(request):
     """Generate video recommendations based on user's syllabus and profile"""
-    firebase_uid = request.session.get('firebase_user', {}).get('uid')
-    if not firebase_uid:
-        return JsonResponse({'success': False, 'error': 'User not authenticated'})
-    
     try:
+        # Check authentication first
+        firebase_uid = request.session.get('firebase_user', {}).get('uid')
+        if not firebase_uid:
+            return JsonResponse({'success': False, 'error': 'User not authenticated'})
+        
         print(f"DEBUG: Starting video generation for user: {firebase_uid}")
         
-        # Get user profile and syllabus from Firebase
-        doc_ref = db.collection('user_profiles').document(firebase_uid)
-        user_doc = doc_ref.get()
-        
-        if not user_doc.exists:
-            return JsonResponse({'success': False, 'error': 'User profile not found'})
-        
-        user_data = user_doc.to_dict()
-        syllabus_content = user_data.get('generated_syllabus', '')
-        preferred_subjects = user_data.get('preferred_subjects', '')
+        # Get user profile and syllabus from Firebase with timeout handling
+        try:
+            doc_ref = db.collection('user_profiles').document(firebase_uid)
+            user_doc = doc_ref.get()
+            
+            if not user_doc.exists:
+                return JsonResponse({'success': False, 'error': 'User profile not found'})
+            
+            user_data = user_doc.to_dict()
+            syllabus_content = user_data.get('generated_syllabus', '')
+            preferred_subjects = user_data.get('preferred_subjects', '')
+            
+        except Exception as firebase_error:
+            print(f"DEBUG: Firebase error: {firebase_error}")
+            return JsonResponse({'success': False, 'error': 'Failed to access user data. Please try again.'})
         
         if not syllabus_content:
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz first.'})
         
         print(f"DEBUG: Found syllabus, starting video generation")
         
-        # Extract topics from syllabus
-        soup = BeautifulSoup(syllabus_content, 'html.parser')
-        raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
-        topics_for_videos = []
-        
-        for topic in raw_topics:
-            cleaned_topic = topic.lower()
-            remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
-            for word in remove_words:
-                cleaned_topic = cleaned_topic.replace(word, '').strip()
-            if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                topics_for_videos.append(cleaned_topic.title())
-        
-        print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
+        # Extract topics from syllabus with error handling
+        try:
+            soup = BeautifulSoup(syllabus_content, 'html.parser')
+            raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
+            topics_for_videos = []
+            
+            for topic in raw_topics:
+                cleaned_topic = topic.lower()
+                remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
+                for word in remove_words:
+                    cleaned_topic = cleaned_topic.replace(word, '').strip()
+                if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
+                    topics_for_videos.append(cleaned_topic.title())
+            
+            print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
+            
+        except Exception as parsing_error:
+            print(f"DEBUG: Syllabus parsing error: {parsing_error}")
+            return JsonResponse({'success': False, 'error': 'Failed to parse syllabus content.'})
         
         if not topics_for_videos:
             return JsonResponse({'success': False, 'error': 'No topics found in syllabus for video generation'})
         
-        recommended_videos_data = []
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        # Initialize Gemini model with error handling
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+        except Exception as model_error:
+            print(f"DEBUG: Gemini model initialization error: {model_error}")
+            return JsonResponse({'success': False, 'error': 'AI service temporarily unavailable. Please try again later.'})
         
-        # Generate videos for topics (limit to 5 to avoid timeout)
-        for i, topic in enumerate(topics_for_videos[:5]):
+        recommended_videos_data = []
+        
+        # Generate videos for topics (limit to 3 to avoid timeout in production)
+        max_topics = min(3, len(topics_for_videos))
+        for i, topic in enumerate(topics_for_videos[:max_topics]):
             try:
-                print(f"DEBUG: Generating videos for topic {i+1}/{min(len(topics_for_videos), 5)}: {topic}")
+                print(f"DEBUG: Generating videos for topic {i+1}/{max_topics}: {topic}")
                 
                 channel_ids = get_relevant_channels_for_topic(topic, preferred_subjects)
                 channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
                 
+                # Simplified prompt for faster processing
                 gemini_video_prompt = f"""
-You are an expert educational video recommender. Here is the full HTML syllabus for context:
------
-{syllabus_content}
------
-For the topic: '{topic}', recommend up to 3 highly relevant YouTube videos. Only select videos from these channel IDs: {channel_id_str}.
-For each video, provide:
-- title
-- video_id (YouTube video ID only)
-- channel_title (the channel's display name)
-Return the result as a JSON array like this:
+For the topic: '{topic}', recommend 2 YouTube videos from channels: {channel_id_str}.
+Return only a JSON array:
 [
-  {{"title": "...", "video_id": "...", "channel_title": "..."}},
-  ...
+  {{"title": "Video Title", "video_id": "abc123", "channel_title": "Channel Name"}},
+  {{"title": "Video Title 2", "video_id": "def456", "channel_title": "Channel Name 2"}}
 ]
-If you can't find 3, return as many as possible. Do not include videos from other channels. Only output the JSON array, nothing else.
 """
                 
+                # Generate with timeout consideration
                 video_response = model.generate_content(gemini_video_prompt)
                 videos = []
+                
                 try:
-                    videos = json.loads(video_response.text)
-                except Exception:
-                    # Try to extract JSON from text if Gemini adds extra text
-                    match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
-                    if match:
-                        videos = json.loads(match.group(1))
+                    # Try to parse JSON response
+                    response_text = video_response.text.strip()
+                    if response_text.startswith('[') and response_text.endswith(']'):
+                        videos = json.loads(response_text)
+                    else:
+                        # Try to extract JSON from text
+                        match = re.search(r'(\[.*\])', response_text, re.DOTALL)
+                        if match:
+                            videos = json.loads(match.group(1))
+                
+                except Exception as json_error:
+                    print(f"DEBUG: JSON parsing error for topic '{topic}': {json_error}")
+                    continue
                 
                 # Filter/validate structure
-                valid_videos = [
-                    {
-                        'title': v.get('title', ''),
-                        'video_id': v.get('video_id', ''),
-                        'channel_title': v.get('channel_title', '')
-                    }
-                    for v in videos if v.get('title') and v.get('video_id')
-                ]
+                valid_videos = []
+                for v in videos:
+                    if isinstance(v, dict) and v.get('title') and v.get('video_id'):
+                        valid_videos.append({
+                            'title': str(v.get('title', '')),
+                            'video_id': str(v.get('video_id', '')),
+                            'channel_title': str(v.get('channel_title', ''))
+                        })
                 
                 if valid_videos:
                     recommended_videos_data.append({
@@ -743,33 +762,39 @@ If you can't find 3, return as many as possible. Do not include videos from othe
                     })
                     print(f"DEBUG: Added {len(valid_videos)} videos for topic: {topic}")
                     
-            except Exception as e:
-                print(f"DEBUG: Video fetch error for topic '{topic}': {e}")
+            except Exception as topic_error:
+                print(f"DEBUG: Video fetch error for topic '{topic}': {topic_error}")
                 continue
         
         # Save recommended videos to Firestore
         if recommended_videos_data:
-            doc_ref.update({
-                'recommended_videos': recommended_videos_data,
-                'last_updated': firestore.SERVER_TIMESTAMP
-            })
-            print(f"DEBUG: Saved {len(recommended_videos_data)} video topics to Firebase")
-            
-            total_videos = sum(len(topic_data.get('videos', [])) for topic_data in recommended_videos_data)
-            return JsonResponse({
-                'success': True,
-                'message': f'Successfully generated {total_videos} videos for {len(recommended_videos_data)} topics!',
-                'video_count': total_videos,
-                'topic_count': len(recommended_videos_data)
-            })
+            try:
+                doc_ref.update({
+                    'recommended_videos': recommended_videos_data,
+                    'last_updated': firestore.SERVER_TIMESTAMP
+                })
+                print(f"DEBUG: Saved {len(recommended_videos_data)} video topics to Firebase")
+                
+                total_videos = sum(len(topic_data.get('videos', [])) for topic_data in recommended_videos_data)
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Successfully generated {total_videos} videos for {len(recommended_videos_data)} topics!',
+                    'video_count': total_videos,
+                    'topic_count': len(recommended_videos_data)
+                })
+                
+            except Exception as save_error:
+                print(f"DEBUG: Firebase save error: {save_error}")
+                return JsonResponse({'success': False, 'error': 'Generated videos but failed to save. Please try again.'})
         else:
             return JsonResponse({'success': False, 'error': 'No videos could be generated. Please try again later.'})
             
     except Exception as e:
-        print(f"DEBUG: Video generation error: {e}")
+        print(f"DEBUG: Unexpected video generation error: {e}")
         import traceback
         traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+        return JsonResponse({'success': False, 'error': 'An unexpected error occurred. Please try again later.'})
+
 
 @login_required
 def dashboard_view(request):
@@ -834,42 +859,88 @@ def syllabus_view(request):
 
 @login_required
 def lesson_view(request):
-    user_profile = None
-    firebase_uid = request.session.get('firebase_user', {}).get('uid')
-    recommended_videos = []
-    completed_videos = set()
-    course_name = "General Knowledge"
+    try:
+        print(f"DEBUG: Lesson view accessed")
+        user_profile = None
+        firebase_uid = request.session.get('firebase_user', {}).get('uid')
+        recommended_videos = []
+        completed_videos = set()
+        course_name = "General Knowledge"
 
-    if firebase_uid:
-        doc_ref = db.collection('user_profiles').document(firebase_uid)
-        doc = doc_ref.get()
-        if doc.exists:
-            user_profile = doc.to_dict()
-            recommended_videos = user_profile.get('recommended_videos', [])
-            
-            # Get course name from preferred subjects
-            preferred_subjects = user_profile.get('specific_goals', '')
-            print(f"Debug - Lesson view - Preferred subjects: {preferred_subjects}")
-            if preferred_subjects and preferred_subjects.strip():
-                # Handle multiple subjects (comma-separated) and extract the first one
-                subjects_list = [subject.strip() for subject in preferred_subjects.split(',')]
-                primary_subject = subjects_list[0].title()
-                course_name = primary_subject
-            else:
-                course_name = "Learning Course"
-            
-            # Get completed videos from all courses
-            all_courses = user_profile.get('all_courses', [])
-            for course in all_courses:
-                completed_videos.update(course.get('completed_videos', []))
-    
-    context = {
-        'user_profile': user_profile,
-        'recommended_videos': recommended_videos,
-        'completed_videos': completed_videos,
-        'course_name': course_name,
-    }
-    return render(request, 'lesson.html', context)
+        print(f"DEBUG: Firebase UID: {firebase_uid}")
+
+        if firebase_uid:
+            try:
+                doc_ref = db.collection('user_profiles').document(firebase_uid)
+                doc = doc_ref.get()
+                print(f"DEBUG: Firebase document exists: {doc.exists}")
+                
+                if doc.exists:
+                    user_profile = doc.to_dict()
+                    recommended_videos = user_profile.get('recommended_videos', [])
+                    print(f"DEBUG: Found {len(recommended_videos)} video topics")
+                    
+                    # Get course name from preferred subjects
+                    preferred_subjects = user_profile.get('specific_goals', '')
+                    print(f"DEBUG: Preferred subjects: {preferred_subjects}")
+                    if preferred_subjects and preferred_subjects.strip():
+                        # Handle multiple subjects (comma-separated) and extract the first one
+                        subjects_list = [subject.strip() for subject in preferred_subjects.split(',')]
+                        primary_subject = subjects_list[0].title()
+                        course_name = primary_subject
+                    else:
+                        course_name = "Learning Course"
+                    
+                    # Get completed videos from all courses
+                    all_courses = user_profile.get('all_courses', [])
+                    for course in all_courses:
+                        completed_videos.update(course.get('completed_videos', []))
+                    
+                    print(f"DEBUG: Course name: {course_name}")
+                    print(f"DEBUG: Completed videos: {len(completed_videos)}")
+                    
+            except Exception as firebase_error:
+                print(f"DEBUG: Firebase error in lesson view: {firebase_error}")
+                # Continue with default values
+        
+        context = {
+            'user_profile': user_profile,
+            'recommended_videos': recommended_videos,
+            'completed_videos': completed_videos,
+            'course_name': course_name,
+        }
+        
+        print(f"DEBUG: Context prepared, rendering template")
+        
+        # Test if it's a template issue
+        try:
+            return render(request, 'lesson.html', context)
+        except Exception as template_error:
+            print(f"DEBUG: Template rendering error: {template_error}")
+            # Return simple HTML for debugging
+            simple_html = f"""
+            <html>
+            <head><title>Lesson Debug</title></head>
+            <body>
+                <h1>Lesson Page Debug</h1>
+                <p>Course: {course_name}</p>
+                <p>Videos: {len(recommended_videos)} topics</p>
+                <p>User Profile: {'Found' if user_profile else 'Not found'}</p>
+                <p>Template Error: {str(template_error)}</p>
+            </body>
+            </html>
+            """
+            from django.http import HttpResponse
+            return HttpResponse(simple_html)
+        
+    except Exception as e:
+        print(f"DEBUG: Lesson view error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return a simple error response
+        from django.http import HttpResponse
+        return HttpResponse(f"Lesson view error: {str(e)}", status=500)
 
 @login_required
 def quiz_view(request):
