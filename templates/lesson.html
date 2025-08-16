@@ -475,6 +475,10 @@
                     // Get CSRF token
                     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
                     
+                    // Create AbortController for timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+                    
                     // Make request to generate videos
                     fetch('{% url "generate_videos" %}', {
                         method: 'POST',
@@ -482,7 +486,8 @@
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRFToken': csrfToken,
                             'Content-Type': 'application/x-www-form-urlencoded',
-                        }
+                        },
+                        signal: controller.signal
                     })
                     .then(response => {
                         if (!response.ok) {
@@ -500,6 +505,9 @@
                         }
                     })
                     .then(data => {
+                        // Clear timeout
+                        clearTimeout(timeoutId);
+                        
                         // Hide loader
                         videoLoader.style.display = 'none';
                         
@@ -517,9 +525,20 @@
                         }
                     })
                     .catch(error => {
+                        // Clear timeout
+                        clearTimeout(timeoutId);
+                        
                         console.error('Error:', error);
                         videoLoader.style.display = 'none';
-                        showNotification('An error occurred while generating videos. Please try again.', 'error');
+                        
+                        let errorMessage = 'An error occurred while generating videos. Please try again.';
+                        if (error.name === 'AbortError') {
+                            errorMessage = 'Video generation timed out. Please try again with a stable connection.';
+                        } else if (error.message.includes('500')) {
+                            errorMessage = 'Server error occurred. Please try again in a few moments.';
+                        }
+                        
+                        showNotification(errorMessage, 'error');
                         // Re-enable button
                         generateVideosBtn.disabled = false;
                         generateVideosBtn.innerHTML = '<i class="fas fa-video"></i> Generate Videos';
