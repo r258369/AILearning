@@ -160,6 +160,128 @@ Format for PDF:
         print(f"DEBUG: Gemini error for {topic}: {e}")
         return create_fallback_content(topic, level)
 
+def get_existing_note_topics(user_id, course_name):
+    """Get list of topics that already have notes generated"""
+    try:
+        sanitized_course_name = re.sub(r'[^a-zA-Z0-9_-]', '_', course_name.lower())
+        course_ref = db.collection('user_profiles').document(user_id).collection('courses').document(sanitized_course_name)
+        notes_ref = course_ref.collection('notes')
+        notes = notes_ref.stream()
+        
+        existing_topics = []
+        for note_doc in notes:
+            note_data = note_doc.to_dict()
+            if note_data.get('topic'):
+                existing_topics.append(note_data['topic'])
+        
+        return existing_topics
+    except Exception as e:
+        print(f"DEBUG: Error getting existing notes: {e}")
+        return []
+
+def calculate_optimal_batch_size(topics, skill_level):
+    """Calculate optimal batch size based on content complexity"""
+    if not topics:  # 🚨 Guard against empty list
+        return 1
+    
+    base_size = 1  # default
+    
+    # Adjust based on skill level (advanced content is more complex)
+    if skill_level == 'advanced':
+        base_size = 1
+    elif skill_level == 'beginner':
+        base_size = 1
+    
+    # Adjust based on topic complexity
+    avg_topic_length = sum(len(topic) for topic in topics[:5]) / min(5, len(topics))
+    if avg_topic_length > 50:  # Long topic names
+        base_size = max(1, base_size - 1)
+    
+    return min(base_size, len(topics))
+
+
+def generate_content_with_timeout(topic, skill_level, specific_goals):
+    """Generate content with cross-platform timeout protection"""
+    try:
+        import threading
+        import time
+        
+        # Cross-platform timeout implementation
+        result = {'content': None, 'error': None, 'completed': False}
+        
+        def generate_content():
+            try:
+                content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
+                result['content'] = content
+                result['completed'] = True
+            except Exception as e:
+                result['error'] = str(e)
+                result['completed'] = True
+        
+        # Start content generation in a separate thread
+        thread = threading.Thread(target=generate_content)
+        thread.daemon = True
+        thread.start()
+        
+        # Wait for completion or timeout (30 seconds)
+        thread.join(timeout=30)
+        
+        if not result['completed']:
+            print(f"DEBUG: Content generation timeout for {topic}")
+            # Use fallback content
+            fallback_content = create_fallback_content(topic, skill_level)
+            sections = parse_gemini_content_to_sections(fallback_content)
+            return {'success': True, 'content': sections}
+        
+        if result['error']:
+            print(f"DEBUG: Content generation error for {topic}: {result['error']}")
+            # Use fallback content
+            fallback_content = create_fallback_content(topic, skill_level)
+            sections = parse_gemini_content_to_sections(fallback_content)
+            return {'success': True, 'content': sections}
+        
+        if result['content']:
+            sections = parse_gemini_content_to_sections(result['content'])
+            if sections.get('notes') and sections.get('assignment'):
+                return {'success': True, 'content': sections}
+        
+        # If we get here, content generation failed
+        print(f"DEBUG: Incomplete content generated for {topic}")
+        fallback_content = create_fallback_content(topic, skill_level)
+        sections = parse_gemini_content_to_sections(fallback_content)
+        return {'success': True, 'content': sections}
+            
+    except Exception as e:
+        print(f"DEBUG: Content generation wrapper error for {topic}: {e}")
+        # Always return fallback content to ensure progress
+        fallback_content = create_fallback_content(topic, skill_level)
+        sections = parse_gemini_content_to_sections(fallback_content)
+        return {'success': True, 'content': sections}
+
+def generate_pdf_with_optimization(content_sections, topic, user_id):
+    """Generate PDF with memory optimization and fallback"""
+    try:
+        # First attempt with full content
+        pdf_content = generate_pdf_from_content(content_sections, topic, user_id)
+        if pdf_content:
+            return {'success': True, 'pdf_content': pdf_content}
+        
+        # Fallback: Try with simplified content
+        simplified_sections = {
+            'notes': content_sections['notes'][:2000],  # Limit to 2000 chars
+            'assignment': content_sections['assignment'][:1000]  # Limit to 1000 chars
+        }
+        
+        pdf_content = generate_pdf_from_content(simplified_sections, topic, user_id)
+        if pdf_content:
+            return {'success': True, 'pdf_content': pdf_content}
+        
+        return {'success': False, 'error': 'PDF generation failed'}
+        
+    except Exception as e:
+        print(f"DEBUG: PDF optimization error for {topic}: {e}")
+        return {'success': False, 'error': str(e)}
+
 def create_fallback_content(topic, level):
     """Create basic fallback content when Gemini fails"""
     return f"""
@@ -1505,52 +1627,97 @@ def mark_video_complete(request):
 
 @login_required
 @require_POST  
-def generate_study_notes(request):
-    """Generate study notes with production-optimized error handling"""
+def clear_user_cache(request):
+    """Clear all cached data for the user"""
     try:
-        # Check authentication
+        firebase_uid = request.session.get('firebase_user', {}).get('uid')
+        if not firebase_uid:
+            return JsonResponse({'success': False, 'error': 'User not authenticated'})
+        
+        # Clear session cache
+        cache_keys_to_clear = [key for key in request.session.keys() if firebase_uid in key]
+        for key in cache_keys_to_clear:
+            del request.session[key]
+        
+        print(f"DEBUG: Cleared {len(cache_keys_to_clear)} cache entries for user {firebase_uid}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Cleared {len(cache_keys_to_clear)} cache entries. Please try generating notes again.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+@require_POST  
+def test_gemini_connection(request):
+    """Test Gemini API connection"""
+    try:
+        print("DEBUG: Testing Gemini API connection...")
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content("Hello, this is a test. Please respond with 'Gemini API is working!'")
+        return JsonResponse({
+            'success': True,
+            'message': 'Gemini API test successful',
+            'response': response.text
+        })
+    except Exception as e:
+        print(f"DEBUG: Gemini API test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Gemini API test failed: {str(e)}'
+        })
+
+@login_required
+@require_POST  
+def generate_study_notes(request):
+    """Generate study notes with advanced timeout and resource management"""
+    try:
         firebase_uid = request.session.get('firebase_user', {}).get('uid')
         if not firebase_uid:
             return JsonResponse({'success': False, 'error': 'User not authenticated.'})
 
-        print(f"DEBUG: Starting note generation for user: {firebase_uid}")
+        print(f"DEBUG: Starting optimized note generation for user: {firebase_uid}")
 
-        # Get user profile with error handling
-        try:
-            user_ref = db.collection('user_profiles').document(firebase_uid)
-            user_doc = user_ref.get()
-            if not user_doc.exists:
-                return JsonResponse({'success': False, 'error': 'User profile not found.'})
-            
-            user_profile_data = user_doc.to_dict()
-            syllabus_content = user_profile_data.get('generated_syllabus')
-            skill_level = user_profile_data.get('skill_level', 'beginner')
-            specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
-            
-        except Exception as firebase_error:
-            print(f"DEBUG: Firebase error: {firebase_error}")
-            return JsonResponse({'success': False, 'error': 'Failed to access user data. Please try again.'})
-
+        # Check if there's an ongoing generation process
+        batch_mode = request.POST.get('batch_mode', 'false') == 'true'
+        start_index = int(request.POST.get('start_index', 0))
+        
+        # Get user profile
+        user_ref = db.collection('user_profiles').document(firebase_uid)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return JsonResponse({'success': False, 'error': 'User profile not found.'})
+        
+        user_profile_data = user_doc.to_dict()
+        syllabus_content = user_profile_data.get('generated_syllabus')
+        skill_level = user_profile_data.get('skill_level', 'beginner')
+        specific_goals = user_profile_data.get('specific_goals', 'learn new concepts')
+        
         if not syllabus_content:
             return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz.'})
 
-        # Extract topics with error handling
-        try:
-            soup = BeautifulSoup(syllabus_content, 'html.parser')
-            raw_topics = []
-            for heading in soup.find_all(['h3']):
-                topic = heading.get_text(strip=True)
-                if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:
-                    raw_topics.append(topic)
-            
-            print(f"DEBUG: Found {len(raw_topics)} topics for notes")
-            
-        except Exception as parsing_error:
-            print(f"DEBUG: Syllabus parsing error: {parsing_error}")
-            return JsonResponse({'success': False, 'error': 'Failed to parse syllabus content.'})
+        
+        
+        # Always extract topics from current syllabus (don't use cache to avoid stale data)
+        soup = BeautifulSoup(syllabus_content, 'html.parser')
+        raw_topics = []
+        for heading in soup.find_all(['h3']):
+            topic = heading.get_text(strip=True)
+            if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:
+                raw_topics.append(topic)
+        if raw_topics:
+        
+        # Clear any old cached topics to prevent confusion
+        cache_key = f"topics_{firebase_uid}"
+        if cache_key in request.session:
+            del request.session[cache_key]
         
         if not raw_topics:
-            return JsonResponse({'success': False, 'error': 'No topics found in the syllabus to generate notes for.'})
+            return JsonResponse({'success': False, 'error': 'No topics found in the syllabus.'})
 
         # Determine course name
         determined_course_name = "General Learning"
@@ -1558,90 +1725,97 @@ def generate_study_notes(request):
             goals_list = [goal.strip() for goal in specific_goals.split(',')]
             determined_course_name = goals_list[0].title()
 
+        # Check existing notes to avoid duplicates
+        existing_notes = get_existing_note_topics(firebase_uid, determined_course_name)
+        remaining_topics = [topic for topic in raw_topics if topic not in existing_notes]
+        
+        print(f"DEBUG: Total topics: {len(raw_topics)}, Existing: {len(existing_notes)}, Remaining: {len(remaining_topics)}")
+
+        if not remaining_topics:
+            return JsonResponse({
+                'success': True, 
+                'message': 'All notes have already been generated!',
+                'total_generated': len(existing_notes),
+                'remaining_topics': 0
+            })
+
+        # Intelligent batch sizing based on content complexity
+        topics_to_process = remaining_topics[start_index:]
+        batch_size = calculate_optimal_batch_size(topics_to_process, skill_level)
+        current_batch = topics_to_process[:batch_size]
+        
+
         new_notes_generated = []
         
-        # Limit topics to prevent memory issues in production (adjust based on server capacity)
-        max_topics = 1  # Increased to 2 - monitor for 500 errors
-        print(f"DEBUG: Processing {max_topics} topics at a time (production optimization)")
-        
-        for i, topic in enumerate(raw_topics[:max_topics]):
+        # Process current batch with optimized resource management
+        for i, topic in enumerate(current_batch):
             try:
-                print(f"DEBUG: Generating notes for topic {i+1}/{max_topics}: {topic}")
+                print(f"DEBUG: Processing topic {start_index + i + 1}/{len(raw_topics)}: {topic}")
                 
-                # Generate content with Gemini
-                try:
-                    gemini_content = generate_structured_content_with_gemini(topic, skill_level, specific_goals)
-                    if not gemini_content:
-                        print(f"DEBUG: No content generated for topic: {topic}")
-                        continue
-                        
-                except Exception as gemini_error:
-                    print(f"DEBUG: Gemini error for topic '{topic}': {gemini_error}")
+                # Generate content with timeout protection
+                content_result = generate_content_with_timeout(topic, skill_level, specific_goals)
+                if not content_result['success']:
+                    print(f"DEBUG: Content generation failed for {topic}: {content_result['error']}")
                     continue
                 
-                # Parse content into sections
-                try:
-                    content_sections = parse_gemini_content_to_sections(gemini_content)
-                    if not (content_sections.get('notes') and content_sections.get('assignment')):
-                        print(f"DEBUG: Incomplete content sections for topic: {topic}")
-                        continue
-                        
-                except Exception as parsing_error:
-                    print(f"DEBUG: Content parsing error for topic '{topic}': {parsing_error}")
+                # Generate PDF with memory optimization
+                pdf_result = generate_pdf_with_optimization(content_result['content'], topic, firebase_uid)
+                if not pdf_result['success']:
+                    print(f"DEBUG: PDF generation failed for {topic}: {pdf_result['error']}")
                     continue
                 
-                # Generate PDF with error handling
-                try:
-                    pdf_content_base64 = generate_pdf_from_content(content_sections, topic, firebase_uid)
-                    if not pdf_content_base64:
-                        print(f"DEBUG: PDF generation failed for topic: {topic}")
-                        continue
-                        
-                except Exception as pdf_error:
-                    print(f"DEBUG: PDF generation error for topic '{topic}': {pdf_error}")
-                    continue
+                # Save to Firestore
+                if save_note_to_firestore(firebase_uid, topic, pdf_result['pdf_content'], determined_course_name):
+                    new_notes_generated.append({
+                        'topic': topic, 
+                        'pdf_url': pdf_result['pdf_content'], 
+                        'course_name': determined_course_name
+                    })
+                    print(f"DEBUG: Successfully generated note for: {topic}")
                 
-                # Save to Firestore with error handling
-                try:
-                    if save_note_to_firestore(firebase_uid, topic, pdf_content_base64, determined_course_name):
-                        new_notes_generated.append({
-                            'topic': topic, 
-                            'pdf_url': pdf_content_base64, 
-                            'course_name': determined_course_name
-                        })
-                        print(f"DEBUG: Successfully generated note for topic: {topic}")
-                    else:
-                        print(f"DEBUG: Failed to save note for topic: {topic}")
-                        
-                except Exception as save_error:
-                    print(f"DEBUG: Save error for topic '{topic}': {save_error}")
-                    continue
-
+                # Memory cleanup after each note
+                import gc
+                gc.collect()
+                
             except Exception as topic_error:
-                print(f"DEBUG: Unexpected error for topic '{topic}': {topic_error}")
+                print(f"DEBUG: Error processing topic '{topic}': {topic_error}")
                 continue
 
-        # Return results
+        # Calculate progress
+        total_processed = start_index + len(current_batch)
+        remaining_count = len(remaining_topics) - len(current_batch)
+        
+        # Prepare response
         if new_notes_generated:
-            total_notes = len(new_notes_generated)
-            remaining_topics = len(raw_topics) - max_topics
-            
-            if remaining_topics > 0:
-                message = f'Generated {total_notes} note successfully! Click "Generate Study Notes" again to create notes for the remaining {remaining_topics} topics.'
+            if remaining_count > 0:
+                message = f'Generated {len(new_notes_generated)} notes successfully! {remaining_count} topics remaining.'
+                # Auto-continue for next batch
+                next_batch_info = {
+                    'has_more': True,
+                    'next_start_index': total_processed,
+                    'remaining_count': remaining_count,
+                    'auto_continue': True
+                }
             else:
-                message = f'Successfully generated {total_notes} study note!'
+                message = f'All {len(new_notes_generated)} notes generated successfully!'
+                next_batch_info = {'has_more': False}
             
             return JsonResponse({
                 'success': True, 
                 'message': message, 
                 'notes': new_notes_generated,
-                'total_generated': total_notes,
-                'remaining_topics': remaining_topics
+                'total_generated': len(new_notes_generated),
+                'progress': {
+                    'current': total_processed,
+                    'total': len(raw_topics),
+                    'percentage': int((total_processed / len(raw_topics)) * 100)
+                },
+                **next_batch_info
             })
         else:
             return JsonResponse({
                 'success': False, 
-                'error': 'No notes could be generated. This might be due to AI service limitations. Please try again later.'
+                'error': 'No notes could be generated in this batch. Please try again.'
             })
 
     except Exception as e:
@@ -1650,7 +1824,7 @@ def generate_study_notes(request):
         traceback.print_exc()
         return JsonResponse({
             'success': False, 
-            'error': 'An unexpected error occurred during note generation. Please try again later.'
+            'error': 'An unexpected error occurred. Please try again.'
         })
 
 
