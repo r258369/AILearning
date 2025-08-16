@@ -522,37 +522,170 @@ def onboarding_quiz_view(request):
                 messages.error(request, error_msg)
                 return redirect('login')
             
-            # Save basic profile to Firebase (without syllabus generation for now)
+            # Save profile to Firebase and generate syllabus
             try:
                 print(f"DEBUG: Saving profile to Firebase for user: {firebase_uid}")
                 doc_ref = db.collection('user_profiles').document(firebase_uid)
-                doc_ref.set({
+                
+                # First save the basic profile
+                profile_data = {
                     'learning_style': quiz_data.get('learning_style'),
                     'preferred_subjects': quiz_data.get('preferred_subjects'),
                     'skill_level': quiz_data.get('skill_level'),
                     'specific_goals': quiz_data.get('specific_goals'),
                     'last_updated': firestore.SERVER_TIMESTAMP
-                }, merge=True)
+                }
+                doc_ref.set(profile_data, merge=True)
                 print(f"DEBUG: Profile saved successfully")
                 
-                # Save a basic syllabus for now
-                basic_syllabus = f"""
-                <h2>Welcome to your learning journey!</h2>
-                <p>Your profile has been saved successfully.</p>
-                <h3>Your Learning Preferences:</h3>
-                <ul>
-                    <li><strong>Learning Style:</strong> {quiz_data.get('learning_style', 'Not specified')}</li>
-                    <li><strong>Preferred Subjects:</strong> {quiz_data.get('preferred_subjects', 'Not specified')}</li>
-                    <li><strong>Skill Level:</strong> {quiz_data.get('skill_level', 'Not specified')}</li>
-                    <li><strong>Goals:</strong> {quiz_data.get('specific_goals', 'Not specified')}</li>
-                </ul>
-                <p>We'll generate your personalized syllabus and video recommendations shortly.</p>
-                """
-                
-                doc_ref.set({
-                    'generated_syllabus': basic_syllabus,
-                    'last_updated': firestore.SERVER_TIMESTAMP
-                }, merge=True)
+                # Generate syllabus and videos with Gemini API
+                try:
+                    print(f"DEBUG: Starting syllabus generation")
+                    
+                    # Create profile for Gemini prompt
+                    profile = {
+                        'level': quiz_data.get('skill_level', 'beginner'),
+                        'subject': quiz_data.get('preferred_subjects', 'general knowledge'),
+                        'style': quiz_data.get('learning_style', 'visual'),
+                        'goal': quiz_data.get('specific_goals', 'learn new concepts')
+                    }
+
+                    prompt = f"""
+Create a 2-week personalized learning plan for a {profile['level']} student.
+Subject: {profile['subject']}
+Learning Style: {profile['style']}
+Goal: {profile['goal']}
+Please structure it as a clean, detailed **HTML syllabus layout** with:
+- Clear headings for weeks (`<h2>`)
+- Subheadings for topics (`<h3>`)
+- Bullet points for activities (`<ul>`, `<li>`)
+- Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
+- Make the section visually appealing with appropriate HTML tags.
+Important: Always keep the each day topics name under <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
+(no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
+Just give me the **content portion** that I can embed directly into my existing Django template.
+"""
+
+                    # Generate syllabus with Gemini
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+                    response = model.generate_content(prompt)
+                    syllabus_content = response.text
+                    print(f"DEBUG: Syllabus generated successfully")
+                    print(f"DEBUG: Syllabus content length: {len(syllabus_content)} characters")
+
+                    # Save the generated syllabus to Firestore
+                    doc_ref.update({
+                        'generated_syllabus': syllabus_content,
+                        'last_updated': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"DEBUG: Generated syllabus saved to Firebase")
+
+                    # Generate video recommendations
+                    try:
+                        print(f"DEBUG: Starting video recommendations")
+                        soup = BeautifulSoup(syllabus_content, 'html.parser')
+                        raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
+                        topics_for_videos = []
+                        
+                        for topic in raw_topics:
+                            cleaned_topic = topic.lower()
+                            remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
+                            for word in remove_words:
+                                cleaned_topic = cleaned_topic.replace(word, '').strip()
+                            if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
+                                topics_for_videos.append(cleaned_topic.title())
+                        
+                        print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
+                        recommended_videos_data = []
+                        
+                        # Limit to first 5 topics to avoid timeout
+                        for i, topic in enumerate(topics_for_videos[:5]):
+                            try:
+                                channel_ids = get_relevant_channels_for_topic(topic, quiz_data.get('preferred_subjects', ''))
+                                channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
+                                
+                                gemini_video_prompt = f"""
+You are an expert educational video recommender. Here is the full HTML syllabus for context:
+-----
+{syllabus_content}
+-----
+For the topic: '{topic}', recommend up to 3 highly relevant YouTube videos. Only select videos from these channel IDs: {channel_id_str}.
+For each video, provide:
+- title
+- video_id (YouTube video ID only)
+- channel_title (the channel's display name)
+Return the result as a JSON array like this:
+[
+  {{"title": "...", "video_id": "...", "channel_title": "..."}},
+  ...
+]
+If you can't find 3, return as many as possible. Do not include videos from other channels. Only output the JSON array, nothing else.
+"""
+                                
+                                video_response = model.generate_content(gemini_video_prompt)
+                                videos = []
+                                try:
+                                    videos = json.loads(video_response.text)
+                                except Exception:
+                                    # Try to extract JSON from text if Gemini adds extra text
+                                    match = re.search(r'(\[.*\])', video_response.text, re.DOTALL)
+                                    if match:
+                                        videos = json.loads(match.group(1))
+                                
+                                # Filter/validate structure
+                                valid_videos = [
+                                    {
+                                        'title': v.get('title', ''),
+                                        'video_id': v.get('video_id', ''),
+                                        'channel_title': v.get('channel_title', '')
+                                    }
+                                    for v in videos if v.get('title') and v.get('video_id')
+                                ]
+                                
+                                if valid_videos:
+                                    recommended_videos_data.append({
+                                        'topic': topic,
+                                        'videos': valid_videos
+                                    })
+                                    print(f"DEBUG: Added {len(valid_videos)} videos for topic: {topic}")
+                                    
+                            except Exception as e:
+                                print(f"DEBUG: Video fetch error for topic '{topic}': {e}")
+                                continue
+                        
+                        # Save recommended videos to Firestore
+                        if recommended_videos_data:
+                            doc_ref.update({
+                                'recommended_videos': recommended_videos_data,
+                                'last_updated': firestore.SERVER_TIMESTAMP
+                            })
+                            print(f"DEBUG: Saved {len(recommended_videos_data)} video topics to Firebase")
+                        
+                    except Exception as video_error:
+                        print(f"DEBUG: Video generation failed: {video_error}")
+                        # Continue without videos - don't fail the entire process
+                    
+                except Exception as syllabus_error:
+                    print(f"DEBUG: Syllabus generation failed: {syllabus_error}")
+                    # Save a basic syllabus as fallback (only if Gemini failed)
+                    print(f"DEBUG: Saving fallback syllabus due to Gemini error")
+                    basic_syllabus = f"""
+                    <h2>Welcome to your learning journey!</h2>
+                    <p>Your profile has been saved successfully.</p>
+                    <h3>Your Learning Preferences:</h3>
+                    <ul>
+                        <li><strong>Learning Style:</strong> {quiz_data.get('learning_style', 'Not specified')}</li>
+                        <li><strong>Preferred Subjects:</strong> {quiz_data.get('preferred_subjects', 'Not specified')}</li>
+                        <li><strong>Skill Level:</strong> {quiz_data.get('skill_level', 'Not specified')}</li>
+                        <li><strong>Goals:</strong> {quiz_data.get('specific_goals', 'Not specified')}</li>
+                    </ul>
+                    <p>We'll generate your personalized syllabus and video recommendations shortly.</p>
+                    """
+                    
+                    doc_ref.update({
+                        'generated_syllabus': basic_syllabus,
+                        'last_updated': firestore.SERVER_TIMESTAMP
+                    })
                 
             except Exception as firebase_error:
                 print(f"DEBUG: Firebase error: {firebase_error}")
