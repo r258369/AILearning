@@ -1561,7 +1561,7 @@ def generate_study_notes(request):
         new_notes_generated = []
         
         # Limit topics to prevent memory issues in production (adjust based on server capacity)
-        max_topics = 2  # Increased to 2 - monitor for 500 errors
+        max_topics = 1  # Increased to 2 - monitor for 500 errors
         print(f"DEBUG: Processing {max_topics} topics at a time (production optimization)")
         
         for i, topic in enumerate(raw_topics[:max_topics]):
