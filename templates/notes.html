@@ -582,44 +582,86 @@
             setTimeout(() => notification.style.display = 'none', 4000);
         }
 
+        let currentStartIndex = 0;
+        let isGenerating = false;
+        
         if (generateBtn) {
             generateBtn.addEventListener('click', function() {
-                generateBtn.disabled = true;
-                generateBtn.innerHTML = `
-                    <div class="loading-dots">
-                        <div></div><div></div><div></div><div></div>
-                    </div>
-                    Generating...
-                `;
-                
-                fetch('{% url "generate_study_notes" %}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                        'Content-Type': 'application/json'
+                if (isGenerating) return;
+                startNoteGeneration();
+            });
+        }
+        
+        function startNoteGeneration(startIndex = 0) {
+            isGenerating = true;
+            currentStartIndex = startIndex;
+            
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = `
+                <div class="loading-dots">
+                    <div></div><div></div><div></div><div></div>
+                </div>
+                Generating batch...
+            `;
+            
+            const formData = new FormData();
+            formData.append('start_index', startIndex);
+            formData.append('batch_mode', 'true');
+            
+            fetch('{% url "generate_study_notes" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    
+                    // Update progress if available
+                    if (data.progress) {
+                        updateProgress(data.progress);
                     }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification(data.message, 'success');
-                        generateBtn.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+                    
+                    // Auto-continue if there are more topics
+                    if (data.has_more && data.auto_continue) {
+                        setTimeout(() => {
+                            startNoteGeneration(data.next_start_index);
+                        }, 2000); // 2 second delay between batches
+                    } else {
+                        // All done
+                        generateBtn.innerHTML = '<i class="fas fa-check-circle"></i> All Notes Generated!';
                         generateBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                         
                         setTimeout(() => {
                             location.reload();
-                        }, 1500);
-                    } else {
-                        showNotification(data.error, 'error');
-                        resetGenerateButton();
+                        }, 2000);
+                        isGenerating = false;
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showNotification('An error occurred while generating notes.', 'error');
+                } else {
+                    showNotification(data.error, 'error');
                     resetGenerateButton();
-                });
+                    isGenerating = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while generating notes.', 'error');
+                resetGenerateButton();
+                isGenerating = false;
             });
+        }
+        
+        function updateProgress(progress) {
+            const percentage = progress.percentage || 0;
+            generateBtn.innerHTML = `
+                <div class="loading-dots">
+                    <div></div><div></div><div></div><div></div>
+                </div>
+                Progress: ${progress.current}/${progress.total} (${percentage}%)
+            `;
         }
         
         function resetGenerateButton() {
