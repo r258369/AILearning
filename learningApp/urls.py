@@ -6,6 +6,7 @@ urlpatterns = [
     path('', views.landing_view, name='landing'),
     path('login/', views.login_view, name='login'),
     path('signup/', views.signup_view, name='signup'),
+
     path('onboarding-quiz/', views.onboarding_quiz_view, name='onboarding_quiz'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
     path('lesson/', views.lesson_view, name='lesson'),
@@ -17,5 +18,6 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('mark-video-complete/', views.mark_video_complete, name='mark_video_complete'),
     path('generate-study-notes/', views.generate_study_notes, name='generate_study_notes'),
+    path('generate-videos/', views.generate_videos_view, name='generate_videos'),
     #path('generate-syllabus/', views.generate_syllabus_view, name='generate-syllabus'),
 ]
