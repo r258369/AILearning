@@ -1709,8 +1709,7 @@ def generate_study_notes(request):
             topic = heading.get_text(strip=True)
             if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:
                 raw_topics.append(topic)
-        if raw_topics:
-        
+     
         # Clear any old cached topics to prevent confusion
         cache_key = f"topics_{firebase_uid}"
         if cache_key in request.session:
