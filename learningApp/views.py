@@ -15,9 +15,6 @@ import requests
 import json
 import re
 import base64
-import tempfile
-import os
-import wikipedia
 import markdown
 from weasyprint import HTML, CSS
 from reportlab.lib.pagesizes import letter
@@ -26,6 +23,12 @@ from firebase_config import db
 from firebase_admin import firestore, auth, storage
 import google.generativeai as genai
 from .forms import UserProfileForm, SignupForm
+import json
+import http.client
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.shortcuts import render
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
@@ -1709,7 +1712,7 @@ def generate_study_notes(request):
             topic = heading.get_text(strip=True)
             if topic and topic not in ["Overview", "Learning Objectives", "Resources", "Week 1", "Week 2", "Week 3", "Week 4"]:
                 raw_topics.append(topic)
-     
+        
         # Clear any old cached topics to prevent confusion
         cache_key = f"topics_{firebase_uid}"
         if cache_key in request.session:
@@ -1930,3 +1933,30 @@ def migrate_user_notes(request):
     except Exception as e:
         print(f"Error migrating user notes: {e}")
         return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+    
+#!...............CHAT VIEW..........
+@csrf_exempt
+@require_http_methods(["POST"])
+def chat_api(request):
+    genai.configure(api_key="AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys")
+    try:
+        # Parse incoming JSON
+        data = json.loads(request.body)
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return JsonResponse({'error': 'Message is required'}, status=400)
+
+        # Call Gemini API
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(user_message)
+
+        # Extract response text
+        content = response.text if hasattr(response, "text") else str(response)
+        
+        return JsonResponse({'success': True, 'response': content})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
