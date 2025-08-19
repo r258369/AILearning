@@ -185,20 +185,38 @@
             justify-content: center;
             flex-direction: column;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            backdrop-filter: blur(3px);
         }
 
-        /* Gradient Animated Loader Text */
+        /* Fixed Gradient Animated Loader Text - Cross-browser compatible */
         .gradient-text {
             font-size: 5rem;
             font-weight: 900;
-            background: linear-gradient(90deg, #973BED 0%, #007CFF 50%, #FFC800 70%, #F0F 100%);
-            background-size: 200% 100%;
+            background: linear-gradient(90deg, 
+                #973BED 0%, 
+                #007CFF 25%, 
+                #FFC800 50%, 
+                #F0F 75%, 
+                #973BED 100%
+            );
+            background-size: 400% 100%;
             background-position: 0% 0%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: gradientShift 4s linear infinite;
+            background-clip: text;
+            color: transparent;
+            animation: gradientShift 3s linear infinite;
             letter-spacing: 0.15em;
             user-select: none;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* Firefox specific fix */
+        @-moz-document url-prefix() {
+            .gradient-text {
+                color: transparent !important;
+            }
         }
 
         @keyframes gradientShift {
@@ -206,32 +224,88 @@
                 background-position: 0% 0%;
             }
             100% {
-                background-position: 200% 0%;
+                background-position: 400% 0%;
             }
         }
 
-        /* Optional bounce on each letter */
-        .gradient-text span {
+        /* Individual letter bounce animation */
+        .gradient-text .letter {
             display: inline-block;
-            animation: bounce 1.2s ease-in-out infinite;
+            animation: bounce 1.5s ease-in-out infinite;
+            transform-origin: center bottom;
         }
-        .gradient-text span:nth-child(1) { animation-delay: 0s; }
-        .gradient-text span:nth-child(2) { animation-delay: 0.1s; }
-        .gradient-text span:nth-child(3) { animation-delay: 0.2s; }
-        .gradient-text span:nth-child(4) { animation-delay: 0.3s; }
+        .gradient-text .letter:nth-child(1) { animation-delay: 0s; }
+        .gradient-text .letter:nth-child(2) { animation-delay: 0.2s; }
+        .gradient-text .letter:nth-child(3) { animation-delay: 0.4s; }
+        .gradient-text .letter:nth-child(4) { animation-delay: 0.6s; }
 
         @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-15px); }
+            0%, 20%, 50%, 80%, 100% { 
+                transform: translateY(0) scale(1); 
+            }
+            40% { 
+                transform: translateY(-20px) scale(1.1); 
+            }
+            60% { 
+                transform: translateY(-10px) scale(1.05); 
+            }
+        }
+
+        /* Loading dots animation */
+        .loading-dots {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .loading-dots span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6366f1;
+            margin: 0 4px;
+            animation: loadingDots 1.4s ease-in-out infinite both;
+        }
+
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes loadingDots {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Fallback for very old browsers that don't support background-clip */
+        @supports not (-webkit-background-clip: text) and not (background-clip: text) {
+            .gradient-text {
+                color: #6366f1 !important;
+                background: none !important;
+                text-shadow: 2px 2px 4px rgba(99, 102, 241, 0.3);
+            }
         }
     </style>
 {% endblock %}
 
 {% block content %}
-    <!-- Loader -->
-    <div id="custom-loader-wrapper" class="flex-center">
-        <div class="gradient-text" aria-label="Loading">
-            <span>W</span><span>A</span><span>I</span><span>T</span>
+    <!-- Enhanced Loader -->
+    <div id="custom-loader-wrapper">
+        <div class="gradient-text">
+            <span class="letter">W</span>
+            <span class="letter">A</span>
+            <span class="letter">I</span>
+            <span class="letter">T</span>
+        </div>
+        <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
     </div>
 
@@ -322,29 +396,54 @@
         }
         applyFormControlClass();
 
-        // Show loader on form submit, hide quiz container
+        // Enhanced loader functionality
         const prefsForm = document.getElementById('quiz-preferences-form');
         const questionsForm = document.getElementById('quiz-questions-form');
         const loader = document.getElementById('custom-loader-wrapper');
         const container = document.querySelector('.quiz-container');
 
-        if (prefsForm) {
-            prefsForm.addEventListener('submit', function() {
-                requestAnimationFrame(() => {
+        function showLoader() {
+            if (loader && container) {
+                // Use setTimeout to ensure proper display
+                setTimeout(() => {
                     loader.style.display = 'flex';
                     container.style.display = 'none';
-                });
+                    // Force reflow
+                    loader.offsetHeight;
+                }, 10);
+            }
+        }
+
+        function hideLoader() {
+            if (loader && container) {
+                loader.style.display = 'none';
+                container.style.display = 'block';
+            }
+        }
+
+        if (prefsForm) {
+            prefsForm.addEventListener('submit', function(e) {
+                showLoader();
             });
         }
 
         if (questionsForm) {
-            questionsForm.addEventListener('submit', function() {
-                requestAnimationFrame(() => {
-                    loader.style.display = 'flex';
-                    container.style.display = 'none';
-                });
+            questionsForm.addEventListener('submit', function(e) {
+                showLoader();
             });
         }
+
+        // Hide loader on page load (in case of back navigation)
+        window.addEventListener('load', function() {
+            hideLoader();
+        });
+
+        // Hide loader if page becomes visible again
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                hideLoader();
+            }
+        });
     });
 </script>
 {% endblock %}
