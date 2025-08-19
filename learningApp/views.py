@@ -29,6 +29,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
+from django.http import HttpResponse
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
@@ -1138,7 +1139,6 @@ def lesson_view(request):
             </body>
             </html>
             """
-            from django.http import HttpResponse
             return HttpResponse(simple_html)
         
     except Exception as e:
@@ -1147,7 +1147,7 @@ def lesson_view(request):
         traceback.print_exc()
         
         # Return a simple error response
-        from django.http import HttpResponse
+        
         return HttpResponse(f"Lesson view error: {str(e)}", status=500)
 
 @login_required
@@ -1197,8 +1197,8 @@ def quiz_view(request):
             Based on the following syllabus, user's preferred subjects: {preferred_subjects}, and specific goals: {specific_goals}, and previous quiz contents, generate a {num_questions}-question quiz with '{quiz_difficulty}' difficulty, in {question_language} language.
 
             Question Type: {question_type}
-            {f'If the question type is MCQ, provide four options and indicate that the user should choose one. Do NOT include correct answers.' if question_type == 'mcq' else ''}
-            {f'If the question type is short_answer, ensure the answer can be given in 5-10 lines. Do NOT include correct answers.' if question_type == 'short_answer' else ''}
+            {f'If the question type is MCQ, provide four options with radio button and indicate that the user should choose one. Do NOT include correct answers.Make questions like problem solving question' if question_type == 'mcq' else ''}
+            {f'If the question type is short_answer, ensure the answer can be given in 5-10 lines. Do NOT include correct answers.Make questions like problem solving question' if question_type == 'short_answer' else ''}
 
             Syllabus:
             {syllabus_content}
@@ -1212,7 +1212,7 @@ def quiz_view(request):
             with:
             - Clear heading for the quiz title (`<h2>` or `<h1>`)
             - Numbered list for questions (`<ol>`, `<li>`)
-            - For each question, provide a clear label and an input field for the user to type their answers. Use `<input type="text" name="question_X_answer">` where X is the 1-indexed question number.
+            - For each question, provide a clear label and an input field for the user to type their answers. Use `<input type="text" name="question_X_answer">` where X is the 1-indexed question number.Dont mention anything in the input field.Maintain the input field width.
             - Make the answer field such that when i press enter or the line is end of the box go to new line and expand the box.
             - Important: Do NOT include correct answers or hints in the generated HTML.
             - Include a submit button for the quiz.Submit button should be like this <button type="submit" class="btn btn-primary mt-4">Submit Quiz</button>
@@ -1953,7 +1953,7 @@ def chat_api(request):
 
         # Extract response text
         content = response.text if hasattr(response, "text") else str(response)
-        
+        print(f"Gemini response: {content}")  # Debugging output
         return JsonResponse({'success': True, 'response': content})
 
     except json.JSONDecodeError:
