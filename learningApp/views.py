@@ -35,6 +35,7 @@ from pytube import Search
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
 #AIzaSyCQytywPJB33ldrGwCqXFmtF4NnHTWsw3w
+#
 
 #Youtube api RH: AIzaSyAqPQ6uGc9pRSM2pizKh_jCCq4PH1RHbAg
 #Youtube api RR: AIzaSyBjBuvcUMEqCX6fafa4KcF8pMzmEL-M49Q
