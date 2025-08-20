@@ -30,6 +30,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
 from django.http import HttpResponse
+from pytube import Search
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
@@ -857,7 +858,7 @@ Just give me the **content portion** that I can embed directly into my existing 
     return render(request, 'onboarding_quiz.html', {'form': form})
 
 
-from pytube import Search
+
 #!......Generate Videos........
 @login_required
 @require_POST
