@@ -20,5 +20,4 @@ urlpatterns = [
     path('generate-videos/', views.generate_videos_view, name='generate_videos'),
     path('clear-cache/', views.clear_user_cache, name='clear_cache'),
     path('test-gemini/', views.test_gemini_connection, name='test_gemini'),
-    #path('generate-syllabus/', views.generate_syllabus_view, name='generate-syllabus'),
 ]
