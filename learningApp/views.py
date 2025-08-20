@@ -770,7 +770,12 @@ Please structure it as a clean, detailed **HTML syllabus layout** with:
 - Bullet points for activities (`<ul>`, `<li>`)
 - Sections like "Overview", "Learning Objectives", and "Resources" if relevant.
 - Make the section visually appealing with appropriate HTML tags.
-Important: Always keep the each day topics name under <h3> tag for example <h3>Day 1-2: Topic 1</h3>. ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
+Important: For each day, create an <h3> heading that includes the day number(s), the main subject, and the specific topic. Do not replace the subject with a generic topic—always mention main focus from {profile['goal']} as main subject.
+Format: <h3>Day X-Y: [Main Subject] – [Specific Topic]</h3>
+Example:
+<h3>Day 1-2: Java Swing – Buttons and Labels</h3>
+<h3>Day 3: Java Swing – Event Handling</h3> 
+ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
 (no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
 Just give me the **content portion** that I can embed directly into my existing Django template.
 """
@@ -851,17 +856,17 @@ Just give me the **content portion** that I can embed directly into my existing 
     form = UserProfileForm(initial=quiz_data)
     return render(request, 'onboarding_quiz.html', {'form': form})
 
+
+from pytube import Search
+#!......Generate Videos........
 @login_required
 @require_POST
 def generate_videos_view(request):
-    """Generate video recommendations based on user's syllabus and profile"""
     try:
         # Check authentication first
         firebase_uid = request.session.get('firebase_user', {}).get('uid')
         if not firebase_uid:
             return JsonResponse({'success': False, 'error': 'User not authenticated'})
-        
-        print(f"DEBUG: Starting video generation for user: {firebase_uid}")
         
         # Get user profile and syllabus from Firebase with timeout handling
         try:
@@ -891,12 +896,23 @@ def generate_videos_view(request):
             topics_for_videos = []
             
             for topic in raw_topics:
-                cleaned_topic = topic.lower()
-                remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts']
-                for word in remove_words:
-                    cleaned_topic = cleaned_topic.replace(word, '').strip()
-                if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                    topics_for_videos.append(cleaned_topic.title())
+                if topic.startswith('Day'):
+                    cleaned_topic = topic.lower()
+                    remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts','&']
+                    
+                    for word in remove_words :
+                        cleaned_topic = cleaned_topic.replace(word, '').strip()
+                    
+                    words = cleaned_topic.split()
+                    
+                    if words and words[0] == 'day':   
+                        # Remove first two words for 'day' topics
+                        cleaned_topic = ' '.join(words[2:]).strip()
+                        
+                    
+                    if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
+                        topics_for_videos.append(cleaned_topic.title())
+                        print(f"DEBUG: Cleaned topic: {cleaned_topic}")
             
             print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
             
@@ -907,13 +923,6 @@ def generate_videos_view(request):
         if not topics_for_videos:
             return JsonResponse({'success': False, 'error': 'No topics found in syllabus for video generation'})
         
-        # Initialize Gemini model with error handling
-        try:
-            model = genai.GenerativeModel("gemini-2.5-flash")
-        except Exception as model_error:
-            print(f"DEBUG: Gemini model initialization error: {model_error}")
-            return JsonResponse({'success': False, 'error': 'AI service temporarily unavailable. Please try again later.'})
-        
         recommended_videos_data = []
         
         # Generate videos for topics (limit to 3 to avoid timeout in production)
@@ -922,37 +931,22 @@ def generate_videos_view(request):
             try:
                 print(f"DEBUG: Generating videos for topic {i+1}/{max_topics}: {topic}")
                 
+                # Get channels for topic (optional, can use for filtering or just for info)
                 channel_ids = get_relevant_channels_for_topic(topic, preferred_subjects)
-                channel_id_str = ', '.join(channel_ids) if channel_ids else 'any educational channel'
                 
-                # Simplified prompt for faster processing
-                gemini_video_prompt = f"""
-For the topic: '{topic}', recommend 2 YouTube videos from channels: {channel_id_str}.
-Return only a JSON array:
-[
-  {{"title": "Video Title", "video_id": "abc123", "channel_title": "Channel Name"}},
-  {{"title": "Video Title 2", "video_id": "def456", "channel_title": "Channel Name 2"}}
-]
-"""
-                
-                # Generate with timeout consideration
-                video_response = model.generate_content(gemini_video_prompt)
+                # --- Replace Gemini generation with pytube search ---
                 videos = []
+                search_query = topic
+                if channel_ids:
+                    search_query += " " + " ".join(channel_ids)  # Optional: append channel names to refine search
                 
-                try:
-                    # Try to parse JSON response
-                    response_text = video_response.text.strip()
-                    if response_text.startswith('[') and response_text.endswith(']'):
-                        videos = json.loads(response_text)
-                    else:
-                        # Try to extract JSON from text
-                        match = re.search(r'(\[.*\])', response_text, re.DOTALL)
-                        if match:
-                            videos = json.loads(match.group(1))
-                
-                except Exception as json_error:
-                    print(f"DEBUG: JSON parsing error for topic '{topic}': {json_error}")
-                    continue
+                search_results = Search(search_query).results[:2]  # Get top 2 videos
+                for video in search_results:
+                    videos.append({
+                        'title': video.title,
+                        'video_id': video.video_id,
+                        'channel_title': video.author
+                    })
                 
                 # Filter/validate structure
                 valid_videos = []
@@ -1005,6 +999,7 @@ Return only a JSON array:
         return JsonResponse({'success': False, 'error': 'An unexpected error occurred. Please try again later.'})
 
 
+#!......dashboard view............
 @login_required
 def dashboard_view(request):
     user_profile = None
@@ -1045,6 +1040,8 @@ def dashboard_view(request):
     }
     return render(request, 'dashboard.html', context)
 
+
+#!......syllabus view............
 @login_required
 def syllabus_view(request):
     user_profile = None
@@ -1066,23 +1063,21 @@ def syllabus_view(request):
     }
     return render(request, 'syllabus.html', context)
 
+
+#!......lesson view............
 @login_required
 def lesson_view(request):
     try:
-        print(f"DEBUG: Lesson view accessed")
         user_profile = None
         firebase_uid = request.session.get('firebase_user', {}).get('uid')
         recommended_videos = []
         completed_videos = set()
         course_name = "General Knowledge"
 
-        print(f"DEBUG: Firebase UID: {firebase_uid}")
-
         if firebase_uid:
             try:
                 doc_ref = db.collection('user_profiles').document(firebase_uid)
                 doc = doc_ref.get()
-                print(f"DEBUG: Firebase document exists: {doc.exists}")
                 
                 if doc.exists:
                     user_profile = doc.to_dict()
@@ -1090,7 +1085,7 @@ def lesson_view(request):
                     print(f"DEBUG: Found {len(recommended_videos)} video topics")
                     
                     # Get course name from preferred subjects
-                    preferred_subjects = user_profile.get('specific_goals', '')
+                    preferred_subjects = user_profile.get('specific_goals', '') 
                     print(f"DEBUG: Preferred subjects: {preferred_subjects}")
                     if preferred_subjects and preferred_subjects.strip():
                         # Handle multiple subjects (comma-separated) and extract the first one
@@ -1119,7 +1114,6 @@ def lesson_view(request):
             'course_name': course_name,
         }
         
-        print(f"DEBUG: Context prepared, rendering template")
         
         # Test if it's a template issue
         try:
@@ -1417,7 +1411,7 @@ def quiz_view(request):
                 'show_quiz_preferences': True # Show preferences
             })
 
-#!...NOTE VIEW.....
+#!......NOTE VIEW........
 @login_required
 def notes_view(request):
     user_profile = None
@@ -1440,6 +1434,8 @@ def notes_view(request):
     }
     return render(request, 'notes.html', context)
 
+
+#!.......Settings and Feedback view........
 @login_required
 def settings_feedback_view(request):
     user_profile = None
@@ -1500,16 +1496,20 @@ def settings_feedback_view(request):
 
     return render(request, 'settings_feedback.html', {'user_profile': user_profile})
 
+
+#!.......Logout view........
 def logout_view(request):
     if 'firebase_user' in request.session:
         del request.session['firebase_user']
     logout(request)
     return redirect('landing')
 
+
+
+#!.......Mark a video as complete........
 @login_required
 @require_POST
 def mark_video_complete(request):
-    """Mark a video as complete and update course progress"""
     try:
         data = json.loads(request.body)
         video_id = data.get('video_id')
@@ -1652,28 +1652,8 @@ def clear_user_cache(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
-@login_required
-@require_POST  
-def test_gemini_connection(request):
-    """Test Gemini API connection"""
-    try:
-        print("DEBUG: Testing Gemini API connection...")
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content("Hello, this is a test. Please respond with 'Gemini API is working!'")
-        return JsonResponse({
-            'success': True,
-            'message': 'Gemini API test successful',
-            'response': response.text
-        })
-    except Exception as e:
-        print(f"DEBUG: Gemini API test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({
-            'success': False,
-            'error': f'Gemini API test failed: {str(e)}'
-        })
 
+#!......Generate study notes............
 @login_required
 @require_POST  
 def generate_study_notes(request):
