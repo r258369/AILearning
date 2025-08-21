@@ -1530,9 +1530,8 @@ def mark_video_complete(request):
         data = json.loads(request.body)
         video_id = data.get('video_id')
         video_title = data.get('video_title')
-        topic = data.get('topic')
         
-        if not all([video_id, video_title, topic]):
+        if not all([video_id, video_title]):
             return JsonResponse({'success': False, 'error': 'Missing required data'})
         
         firebase_uid = request.session.get('firebase_user', {}).get('uid')
@@ -1582,11 +1581,10 @@ def mark_video_complete(request):
                     course['last_activity'] = timezone.now().isoformat()
                     
                     # Calculate progress based on total videos in the course
-                    # Get total videos from recommended_videos
                     total_videos = 0
                     recommended_videos = user_data.get('recommended_videos', [])
-                    for topic_data in recommended_videos:
-                        total_videos += len(topic_data.get('videos', []))
+                    for video_data in recommended_videos:
+                        total_videos += len(video_data.get('videos', []))
                     
                     # If no recommended videos, use default estimate
                     if total_videos == 0:
@@ -1610,8 +1608,8 @@ def mark_video_complete(request):
             # Calculate total videos for progress calculation
             total_videos = 0
             recommended_videos = user_data.get('recommended_videos', []) if user_data else []
-            for topic_data in recommended_videos:
-                total_videos += len(topic_data.get('videos', []))
+            for video_data in recommended_videos:
+                total_videos += len(video_data.get('videos', []))
             
             if total_videos == 0:
                 total_videos = 15
