@@ -506,10 +506,7 @@
             <!-- Debug info -->
             <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px;">
                 <p><strong>Video generation is limited to 5-10 videos for fast testing purpose</strong></p>
-                <strong>Debug Info:</strong> Found {{ recommended_videos|length }} topics with videos
-                {% for topic_data in recommended_videos %}
-                    <br>- {{ topic_data.topic }}: {{ topic_data.videos|length }} videos
-                {% endfor %}
+                
             </div>
             
             <div class="lesson-main-content">
@@ -555,20 +552,20 @@
                 </div>
                 
                 <div class="playlist-sidebar" id="playlist-sidebar">
-                    <h3>Video Playlist</h3>
-                    {% for topic_data in recommended_videos %}
-                        <div class="topic-section">
-                            <div class="topic-title">{{ topic_data.topic }}</div>
-                            <ul>
-                                {% for video in topic_data.videos %}
-                                    <li class="{% if forloop.first and forloop.parentloop.first %}active{% endif %}" data-topic="{{ topic_data.topic }}" data-video-index="{{ forloop.counter0 }}">
-                                        {{ video.title }}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endfor %}
-                </div>
+    <h3>Video Playlist</h3>
+    {% for topic_data in recommended_videos %}
+        <ul>
+            {% for video in topic_data.videos %}
+                <li class="{% if forloop.first and forloop.parentloop.first %}active{% endif %}" 
+                    data-topic="{{ topic_data.suggested_title }}" 
+                    data-video-index="{{ forloop.counter0 }}">
+                    {{ video.title }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
+</div>
+
             </div>
 
         {% else %}
