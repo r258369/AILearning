@@ -30,12 +30,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
 from django.http import HttpResponse
-from pytube import Search
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
 #AIzaSyCQytywPJB33ldrGwCqXFmtF4NnHTWsw3w
-#
 
 #Youtube api RH: AIzaSyAqPQ6uGc9pRSM2pizKh_jCCq4PH1RHbAg
 #Youtube api RR: AIzaSyBjBuvcUMEqCX6fafa4KcF8pMzmEL-M49Q
@@ -577,7 +575,7 @@ def landing_view(request):
     return render(request, 'landing.html')
 
 
-
+#!........Login View..........
 def login_view(request):
     if request.method == 'POST':
         email = request.POST.get('email')
@@ -675,6 +673,7 @@ def signup_view(request):
                     'last_quiz_taken': '',
                     'courses_progress': [],
                     'badges': [],
+                    'suggested_video_titles': [],
                     'last_updated': firestore.SERVER_TIMESTAMP
                 })
 
@@ -761,6 +760,7 @@ def onboarding_quiz_view(request):
                         'goal': quiz_data.get('specific_goals', 'learn new concepts')
                     }
 
+                    # Main syllabus prompt
                     prompt = f"""
 Create a 2-week personalized learning plan for a {profile['level']} student.
 Subject: {profile['subject']}
@@ -777,7 +777,7 @@ Format: <h3>Day X-Y: [Main Subject] – [Specific Topic]</h3>
 Example:
 <h3>Day 1-2: Java Swing – Buttons and Labels</h3>
 <h3>Day 3: Java Swing – Event Handling</h3> 
-ONLY return the HTML **so that i just copy in my Django template**, NOT the full HTML structure 
+ONLY return the HTML **so that I just copy in my Django template**, NOT the full HTML structure 
 (no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` tags). 
 Just give me the **content portion** that I can embed directly into my existing Django template.
 """
@@ -796,8 +796,43 @@ Just give me the **content portion** that I can embed directly into my existing 
                     })
                     print(f"DEBUG: Generated syllabus saved to Firebase")
 
-                    print(f"DEBUG: Syllabus generation completed, skipping video generation for now")
-                    
+                    # Generate suggested video titles for each topic as list
+                    print(f"DEBUG: Starting video title generation")
+                    video_prompt = f"""
+Based on the following syllabus, suggest **2 YouTube video titles per topic/day** that a student should watch.
+The titles should be realistic and engaging, like actual YouTube videos.
+Return the result strictly as a **flat list of strings**, ignoring JSON formatting.
+
+Syllabus:
+{syllabus_content}
+
+Example output (as list of strings):
+[
+"Java Swing Tutorial: Buttons and Labels Made Easy",
+"Learn Java Swing Buttons & Labels in 15 Minutes",
+"Java Swing Event Handling Explained with Examples",
+"Mastering Event Handling in Java Swing"
+]
+"""
+
+                    video_response = model.generate_content(video_prompt)
+                    # Convert to Python list safely
+                    try:
+                        suggested_videos_list = eval(video_response.text.strip())
+                        if not isinstance(suggested_videos_list, list):
+                            suggested_videos_list = []
+                    except Exception:
+                        suggested_videos_list = []
+
+                    print(f"DEBUG: Video titles generated successfully: {len(suggested_videos_list)} titles")
+
+                    # Save suggested video titles as list to Firestore
+                    doc_ref.update({
+                        'suggested_video_titles': suggested_videos_list,
+                        'last_updated': firestore.SERVER_TIMESTAMP
+                    })
+                    print(f"DEBUG: Suggested video titles saved to Firebase as list")
+
                 except Exception as syllabus_error:
                     print(f"DEBUG: Syllabus generation failed: {syllabus_error}")
                     # Save a basic syllabus as fallback (only if Gemini failed)
@@ -860,9 +895,12 @@ Just give me the **content portion** that I can embed directly into my existing 
 
 
 
+
+from pytube import Search
 #!......Generate Videos........
 @login_required
 @require_POST
+
 def generate_videos_view(request):
     try:
         # Check authentication first
@@ -870,7 +908,7 @@ def generate_videos_view(request):
         if not firebase_uid:
             return JsonResponse({'success': False, 'error': 'User not authenticated'})
         
-        # Get user profile and syllabus from Firebase with timeout handling
+        # Get user profile and suggested video titles from Firebase
         try:
             doc_ref = db.collection('user_profiles').document(firebase_uid)
             user_doc = doc_ref.get()
@@ -879,78 +917,42 @@ def generate_videos_view(request):
                 return JsonResponse({'success': False, 'error': 'User profile not found'})
             
             user_data = user_doc.to_dict()
-            syllabus_content = user_data.get('generated_syllabus', '')
+            suggested_video_titles = user_data.get('suggested_video_titles', [])
             preferred_subjects = user_data.get('preferred_subjects', '')
             
         except Exception as firebase_error:
             print(f"DEBUG: Firebase error: {firebase_error}")
             return JsonResponse({'success': False, 'error': 'Failed to access user data. Please try again.'})
         
-        if not syllabus_content:
-            return JsonResponse({'success': False, 'error': 'No syllabus found. Please complete the onboarding quiz first.'})
+        if not suggested_video_titles:
+            return JsonResponse({'success': False, 'error': 'No suggested video titles found. Please complete the onboarding quiz first.'})
         
-        print(f"DEBUG: Found syllabus, starting video generation")
-        
-        # Extract topics from syllabus with error handling
-        try:
-            soup = BeautifulSoup(syllabus_content, 'html.parser')
-            raw_topics = [h3.get_text(strip=True) for h3 in soup.find_all('h3')]
-            topics_for_videos = []
-            
-            for topic in raw_topics:
-                if topic.startswith('Day'):
-                    cleaned_topic = topic.lower()
-                    remove_words = ['overview', 'introduction', 'basics', 'fundamentals', 'principles', 'concepts','&']
-                    
-                    for word in remove_words :
-                        cleaned_topic = cleaned_topic.replace(word, '').strip()
-                    
-                    words = cleaned_topic.split()
-                    
-                    if words and words[0] == 'day':   
-                        # Remove first two words for 'day' topics
-                        cleaned_topic = ' '.join(words[2:]).strip()
-                        
-                    
-                    if len(cleaned_topic) > 2 and cleaned_topic.title() not in topics_for_videos:
-                        topics_for_videos.append(cleaned_topic.title())
-                        print(f"DEBUG: Cleaned topic: {cleaned_topic}")
-            
-            print(f"DEBUG: Found {len(topics_for_videos)} topics for videos")
-            
-        except Exception as parsing_error:
-            print(f"DEBUG: Syllabus parsing error: {parsing_error}")
-            return JsonResponse({'success': False, 'error': 'Failed to parse syllabus content.'})
-        
-        if not topics_for_videos:
-            return JsonResponse({'success': False, 'error': 'No topics found in syllabus for video generation'})
-        
+        print(f"DEBUG: Found {len(suggested_video_titles)} suggested video titles, starting video fetch")
+
         recommended_videos_data = []
-        
-        # Generate videos for topics (limit to 3 to avoid timeout in production)
-        max_topics = min(3, len(topics_for_videos))
-        for i, topic in enumerate(topics_for_videos[:max_topics]):
+
+        # Generate videos for each suggested title (limit to avoid timeout)
+        max_titles = min(10, len(suggested_video_titles))  # fetch top 10 titles to avoid long processing
+        for i, title in enumerate(suggested_video_titles[:max_titles]):
             try:
-                print(f"DEBUG: Generating videos for topic {i+1}/{max_topics}: {topic}")
-                
-                # Get channels for topic (optional, can use for filtering or just for info)
-                channel_ids = get_relevant_channels_for_topic(topic, preferred_subjects)
-                
-                # --- Replace Gemini generation with pytube search ---
+                print(f"DEBUG: Fetching videos for title {i+1}/{max_titles}: {title}")
+
+                # Optional: refine search with preferred subjects
+                search_query = title
+                if preferred_subjects:
+                    search_query += f" {preferred_subjects}"
+
+                # Use pytube to search
+                search_results = Search(search_query).results[:1]  # get top 2 videos
                 videos = []
-                search_query = topic
-                if channel_ids:
-                    search_query += " " + " ".join(channel_ids)  # Optional: append channel names to refine search
-                
-                search_results = Search(search_query).results[:2]  # Get top 2 videos
                 for video in search_results:
                     videos.append({
                         'title': video.title,
                         'video_id': video.video_id,
                         'channel_title': video.author
                     })
-                
-                # Filter/validate structure
+
+                # Validate structure
                 valid_videos = []
                 for v in videos:
                     if isinstance(v, dict) and v.get('title') and v.get('video_id'):
@@ -959,16 +961,16 @@ def generate_videos_view(request):
                             'video_id': str(v.get('video_id', '')),
                             'channel_title': str(v.get('channel_title', ''))
                         })
-                
+
                 if valid_videos:
                     recommended_videos_data.append({
-                        'topic': topic,
+                        'suggested_title': title,
                         'videos': valid_videos
                     })
-                    print(f"DEBUG: Added {len(valid_videos)} videos for topic: {topic}")
-                    
-            except Exception as topic_error:
-                print(f"DEBUG: Video fetch error for topic '{topic}': {topic_error}")
+                    print(f"DEBUG: Added {len(valid_videos)} videos for suggested title: {title}")
+
+            except Exception as video_error:
+                print(f"DEBUG: Video fetch error for suggested title: {video_error}")
                 continue
         
         # Save recommended videos to Firestore
@@ -978,27 +980,32 @@ def generate_videos_view(request):
                     'recommended_videos': recommended_videos_data,
                     'last_updated': firestore.SERVER_TIMESTAMP
                 })
-                print(f"DEBUG: Saved {len(recommended_videos_data)} video topics to Firebase")
-                
-                total_videos = sum(len(topic_data.get('videos', [])) for topic_data in recommended_videos_data)
+                print(f"DEBUG: Saved {len(recommended_videos_data)} recommended video entries to Firebase")
+
+                total_videos = sum(len(entry.get('videos', [])) for entry in recommended_videos_data)
                 return JsonResponse({
                     'success': True,
-                    'message': f'Successfully generated {total_videos} videos for {len(recommended_videos_data)} topics!',
+                    'message': f'Successfully fetched {total_videos} videos for {len(recommended_videos_data)} suggested titles!',
                     'video_count': total_videos,
-                    'topic_count': len(recommended_videos_data)
+                    'title_count': len(recommended_videos_data)
                 })
-                
             except Exception as save_error:
                 print(f"DEBUG: Firebase save error: {save_error}")
-                return JsonResponse({'success': False, 'error': 'Generated videos but failed to save. Please try again.'})
+                return JsonResponse({'success': False, 'error': 'Videos fetched but failed to save. Please try again.'})
         else:
-            return JsonResponse({'success': False, 'error': 'No videos could be generated. Please try again later.'})
-            
+            return JsonResponse({'success': False, 'error': 'No videos could be fetched. Please try again later.'})
+
     except Exception as e:
         print(f"DEBUG: Unexpected video generation error: {e}")
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': 'An unexpected error occurred. Please try again later.'})
+
+
+
+
+
+
 
 
 #!......dashboard view............
@@ -1942,25 +1949,3 @@ def chat_api(request):
         return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
-
-@login_required
-@require_POST  
-def test_gemini_connection(request):
-    """Test Gemini API connection"""
-    try:
-        print("DEBUG: Testing Gemini API connection...")
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content("Hello, this is a test. Please respond with 'Gemini API is working!'")
-        return JsonResponse({
-            'success': True,
-            'message': 'Gemini API test successful',
-            'response': response.text
-        })
-    except Exception as e:
-        print(f"DEBUG: Gemini API test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({
-            'success': False,
-            'error': f'Gemini API test failed: {str(e)}'
-        })
