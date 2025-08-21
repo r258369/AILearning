@@ -1949,3 +1949,25 @@ def chat_api(request):
         return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
+
+@login_required
+@require_POST  
+def test_gemini_connection(request):
+    """Test Gemini API connection"""
+    try:
+        print("DEBUG: Testing Gemini API connection...")
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content("Hello, this is a test. Please respond with 'Gemini API is working!'")
+        return JsonResponse({
+            'success': True,
+            'message': 'Gemini API test successful',
+            'response': response.text
+        })
+    except Exception as e:
+        print(f"DEBUG: Gemini API test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Gemini API test failed: {str(e)}'
+        })
