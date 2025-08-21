@@ -1,3 +1,4 @@
+
 from datetime import datetime
 from bs4 import BeautifulSoup
 from django.http import JsonResponse
@@ -798,40 +799,6 @@ Just give me the **content portion** that I can embed directly into my existing 
 
                     # Generate suggested video titles for each topic as list
                     print(f"DEBUG: Starting video title generation")
-                    video_prompt = f"""
-Based on the following syllabus, suggest **2 YouTube video titles per topic/day** that a student should watch.
-The titles should be realistic and engaging, like actual YouTube videos.
-Return the result strictly as a **flat list of strings**, ignoring JSON formatting.
-
-Syllabus:
-{syllabus_content}
-
-Example output (as list of strings):
-[
-"Java Swing Tutorial: Buttons and Labels Made Easy",
-"Learn Java Swing Buttons & Labels in 15 Minutes",
-"Java Swing Event Handling Explained with Examples",
-"Mastering Event Handling in Java Swing"
-]
-"""
-
-                    video_response = model.generate_content(video_prompt)
-                    # Convert to Python list safely
-                    try:
-                        suggested_videos_list = eval(video_response.text.strip())
-                        if not isinstance(suggested_videos_list, list):
-                            suggested_videos_list = []
-                    except Exception:
-                        suggested_videos_list = []
-
-                    print(f"DEBUG: Video titles generated successfully: {len(suggested_videos_list)} titles")
-
-                    # Save suggested video titles as list to Firestore
-                    doc_ref.update({
-                        'suggested_video_titles': suggested_videos_list,
-                        'last_updated': firestore.SERVER_TIMESTAMP
-                    })
-                    print(f"DEBUG: Suggested video titles saved to Firebase as list")
 
                 except Exception as syllabus_error:
                     print(f"DEBUG: Syllabus generation failed: {syllabus_error}")
@@ -903,6 +870,46 @@ from pytube import Search
 
 def generate_videos_view(request):
     try:
+        user_profile = None
+        firebase_uid = request.session.get('firebase_user', {}).get('uid')
+        doc_ref = db.collection('user_profiles').document(firebase_uid)
+        doc = doc_ref.get()
+        user_profile = doc.to_dict()
+        syllabus_content = user_profile.get('generated_syllabus', [])        
+        print(f"DEBUG: Syllabus content length: {len(syllabus_content)} characters")
+        video_prompt = f"""
+Based on the following syllabus, suggest **2 YouTube video titles per topic/day** that a student should watch.Video length should be under 5-20 min. The titles should be realistic and engaging, like actual YouTube videos.
+Return the result strictly as a **flat list of strings**, ignoring JSON formatting.
+
+Syllabus:
+{syllabus_content}
+
+Example output (as list of strings):
+[
+"Java Swing Tutorial: Buttons and Labels Made Easy",
+"Learn Java Swing Buttons & Labels in 15 Minutes",
+"Java Swing Event Handling Explained with Examples",
+"Mastering Event Handling in Java Swing"
+]
+"""
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        video_response = model.generate_content(video_prompt)
+        # Convert to Python list safely
+        try:
+            suggested_videos_list = eval(video_response.text.strip())
+            if not isinstance(suggested_videos_list, list):
+                suggested_videos_list = []
+        except Exception:
+            suggested_videos_list = []
+
+        print(f"DEBUG: Video titles generated successfully: {len(suggested_videos_list)} titles")
+
+        # Save suggested video titles as list to Firestore
+        doc_ref.update({
+            'suggested_video_titles': suggested_videos_list,
+            'last_updated': firestore.SERVER_TIMESTAMP
+        })
+        print(f"DEBUG: Suggested video titles saved to Firebase as list")
         # Check authentication first
         firebase_uid = request.session.get('firebase_user', {}).get('uid')
         if not firebase_uid:
@@ -1949,7 +1956,6 @@ def chat_api(request):
         return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
-
 @login_required
 @require_POST  
 def test_gemini_connection(request):
