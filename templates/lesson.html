@@ -70,48 +70,6 @@
             background: linear-gradient(90deg, #2563eb, #7dd3fc);
             border-radius: 2px;
         }
-        .topic-section {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            position: relative;
-        }
-        .topic-section:not(:last-child)::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 10%;
-            right: 10%;
-            height: 1px;
-            background: linear-gradient(to right, transparent, rgba(209, 213, 219, 0.5), transparent);
-        }
-        .topic-title {
-            font-weight: 600;
-            color: #1e40af;
-            margin-bottom: 12px;
-            font-size: 1.25em;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            padding: 8px 12px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.7);
-        }
-        .topic-title:hover {
-            background: rgba(59, 130, 246, 0.1);
-            color: #2563eb;
-        }
-        .topic-title::before {
-            content: '⚬';
-            font-size: 1em;
-            color: #60a5fa;
-            transition: transform 0.3s ease, color 0.3s ease;
-        }
-        .topic-section.collapsed .topic-title::before {
-            transform: rotate(90deg);
-            color: #93c5fd;
-        }
         .playlist-sidebar ul {
             list-style: none;
             padding: 0;
@@ -240,8 +198,6 @@
             transform: none;
             box-shadow: none;
         }
-
-        /* Enhanced Video Loader Styles */
         #video-loader-wrapper {
             display: none;
             position: fixed;
@@ -254,8 +210,6 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             backdrop-filter: blur(3px);
         }
-
-        /* Fixed Gradient Animated Loader Text */
         .gradient-text {
             font-size: 4rem;
             font-weight: 900;
@@ -278,15 +232,11 @@
             text-align: center;
             line-height: 1.2;
         }
-
-        /* Firefox specific fix */
         @-moz-document url-prefix() {
             .gradient-text {
                 color: transparent !important;
             }
         }
-
-        /* Individual letter bounce animation */
         .gradient-text .letter {
             display: inline-block;
             animation: bounce 1.2s ease-in-out infinite;
@@ -302,34 +252,19 @@
         .gradient-text .letter:nth-child(8) { animation-delay: 0.7s; }
         .gradient-text .letter:nth-child(9) { animation-delay: 0.8s; }
         .gradient-text .letter:nth-child(10) { animation-delay: 0.9s; }
-
         @keyframes gradientShift {
-            0% {
-                background-position: 0% 0%;
-            }
-            100% {
-                background-position: 400% 0%;
-            }
+            0% { background-position: 0% 0%; }
+            100% { background-position: 400% 0%; }
         }
-
         @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% { 
-                transform: translateY(0) scale(1); 
-            }
-            40% { 
-                transform: translateY(-15px) scale(1.05); 
-            }
-            60% { 
-                transform: translateY(-8px) scale(1.02); 
-            }
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0) scale(1); }
+            40% { transform: translateY(-15px) scale(1.05); }
+            60% { transform: translateY(-8px) scale(1.02); }
         }
-
-        /* Loading dots animation */
         .loading-dots {
             margin-top: 20px;
             text-align: center;
         }
-
         .loading-dots span {
             display: inline-block;
             width: 12px;
@@ -339,23 +274,13 @@
             margin: 0 4px;
             animation: loadingDots 1.4s ease-in-out infinite both;
         }
-
         .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
         .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
         .loading-dots span:nth-child(3) { animation-delay: 0s; }
-
         @keyframes loadingDots {
-            0%, 80%, 100% {
-                transform: scale(0);
-                opacity: 0.5;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
         }
-
-        /* Fallback for very old browsers that don't support background-clip */
         @supports not (-webkit-background-clip: text) and not (background-clip: text) {
             .gradient-text {
                 color: #6366f1 !important;
@@ -363,8 +288,6 @@
                 text-shadow: 2px 2px 4px rgba(99, 102, 241, 0.3);
             }
         }
-
-        /* Notification animations */
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -373,8 +296,6 @@
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
         }
-
-        /* Burger menu button */
         .burger-menu {
             display: none;
             position: fixed;
@@ -410,8 +331,6 @@
         .burger-menu.active span:nth-child(3) {
             transform: rotate(-45deg) translate(7px, -7px);
         }
-
-        /* Responsive design */
         @media (max-width: 768px) {
             .lesson-main-content {
                 flex-direction: column;
@@ -441,9 +360,6 @@
             .playlist-sidebar h3 {
                 font-size: 1.4em;
             }
-            .topic-title {
-                font-size: 1.15em;
-            }
             .playlist-sidebar li {
                 font-size: 0.9em;
                 padding: 10px 12px;
@@ -457,9 +373,7 @@
     <div class="container">
         <div class="lesson-header">
             <h1>{{ course_name }} Course</h1>
-            <p>Watch personalized educational videos based on your syllabus topics.</p>
-            
-            <!-- Generate Videos Button -->
+            <p>Watch personalized educational videos based on your syllabus.</p>
             <div class="generate-videos-section" style="margin-top: 20px;">
                 <button id="generate-videos-btn" class="btn btn-primary">
                     <i class="fas fa-video"></i> Generate Videos
@@ -474,7 +388,6 @@
             </div>
         </div>
 
-        <!-- Enhanced Loader -->
         <div id="video-loader-wrapper">
             <div class="gradient-text" aria-label="Loading">
                 <span class="letter">G</span>
@@ -495,7 +408,6 @@
             </div>
         </div>
 
-        <!-- Burger Menu Button -->
         <button class="burger-menu" id="burger-menu">
             <span></span>
             <span></span>
@@ -503,36 +415,32 @@
         </button>
 
         {% if recommended_videos %}
-            <!-- Debug info -->
             <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px;">
                 <p><strong>Video generation is limited to 5-10 videos for fast testing purpose</strong></p>
-                
             </div>
             
             <div class="lesson-main-content">
                 <div class="lesson-video-section">
                     <div class="lesson-content-display">
-                        {% for topic_data in recommended_videos %}
-                            {% for video in topic_data.videos %}
-                                <div class="video-card {% if forloop.first and forloop.parentloop.first %}active{% endif %}" data-topic="{{ topic_data.topic }}" data-video-index="{{ forloop.counter0 }}">
+                        {% for video_data in recommended_videos %}
+                            {% for video in video_data.videos %}
+                                <div class="video-card {% if forloop.first and forloop.parentloop.first %}active{% endif %}" 
+                                     data-video-index="{{ forloop.counter0 }}">
                                     <div class="video-info">
-                                        <h2>{{ topic_data.topic }}</h2>
-                                        <p><strong>{{ video.title }}</strong></p>
+                                        <h2>{{ video.title }}</h2>
                                         <p>Channel: {{ video.channel_title }}</p>
                                         <div class="video-actions">
                                             {% if video.video_id in completed_videos %}
                                                 <button class="btn btn-success mark-complete-btn completed" 
                                                         data-video-id="{{ video.video_id }}" 
                                                         data-video-title="{{ video.title }}"
-                                                        data-topic="{{ topic_data.topic }}"
                                                         disabled>
                                                     <i class="fas fa-check-circle"></i> Completed
                                                 </button>
                                             {% else %}
                                                 <button class="btn btn-success mark-complete-btn" 
                                                         data-video-id="{{ video.video_id }}" 
-                                                        data-video-title="{{ video.title }}"
-                                                        data-topic="{{ topic_data.topic }}">
+                                                        data-video-title="{{ video.title }}">
                                                     <i class="fas fa-check"></i> Mark as Complete
                                                 </button>
                                             {% endif %}
@@ -552,20 +460,18 @@
                 </div>
                 
                 <div class="playlist-sidebar" id="playlist-sidebar">
-    <h3>Video Playlist</h3>
-    {% for topic_data in recommended_videos %}
-        <ul>
-            {% for video in topic_data.videos %}
-                <li class="{% if forloop.first and forloop.parentloop.first %}active{% endif %}" 
-                    data-topic="{{ topic_data.suggested_title }}" 
-                    data-video-index="{{ forloop.counter0 }}">
-                    {{ video.title }}
-                </li>
-            {% endfor %}
-        </ul>
-    {% endfor %}
-</div>
-
+                    <h3>Video Playlist</h3>
+                    <ul>
+                        {% for video_data in recommended_videos %}
+                            {% for video in video_data.videos %}
+                                <li class="{% if forloop.first and forloop.parentloop.first %}active{% endif %}" 
+                                    data-video-index="{{ forloop.counter0 }}">
+                                    {{ video.title }}
+                                </li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
 
         {% else %}
@@ -578,19 +484,13 @@
     </div>
 
     <script>
-        // Load the IFrame Player API code asynchronously.
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         var firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-        function onPlayerReady(event) {
-            // Optional: You can do something when player is ready
-        }
-
-        function onPlayerStateChange(event) {
-            // Optional: You can respond to player state changes
-        }
+        function onPlayerReady(event) {}
+        function onPlayerStateChange(event) {}
 
         function onYouTubeIframeAPIReady() {
             const videoCards = document.querySelectorAll('.video-card');
@@ -625,21 +525,11 @@
 
             function updateVideoDisplay() {
                 stopAllVideos();
-
                 videoCards.forEach((card, index) => {
-                    if (index === currentVideoIndex) {
-                        card.classList.add('active');
-                    } else {
-                        card.classList.remove('active');
-                    }
+                    card.classList.toggle('active', index === currentVideoIndex);
                 });
-
                 playlistItems.forEach((item, index) => {
-                    if (index === currentVideoIndex) {
-                        item.classList.add('active');
-                    } else {
-                        item.classList.remove('active');
-                    }
+                    item.classList.toggle('active', index === currentVideoIndex);
                 });
             }
 
@@ -654,27 +544,25 @@
                 });
             });
 
-            // Show first video by default
             if (videoCards.length > 0) {
                 updateVideoDisplay();
             }
         }
 
-        // Handle mark as complete functionality
         document.addEventListener('DOMContentLoaded', function() {
             const markCompleteButtons = document.querySelectorAll('.mark-complete-btn:not(.completed)');
             
             markCompleteButtons.forEach(button => {
                 button.addEventListener('click', function() {
+                    if (this.classList.contains('processing')) return;
+
                     const videoId = this.getAttribute('data-video-id');
                     const videoTitle = this.getAttribute('data-video-title');
-                    const topic = this.getAttribute('data-topic');
                     
-                    // Disable button to prevent double-clicking
+                    this.classList.add('processing');
                     this.disabled = true;
                     this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
                     
-                    // Send AJAX request to mark video as complete
                     fetch('{% url "mark_video_complete" %}', {
                         method: 'POST',
                         headers: {
@@ -683,38 +571,39 @@
                         },
                         body: JSON.stringify({
                             video_id: videoId,
-                            video_title: videoTitle,
-                            topic: topic
+                            video_title: videoTitle
                         })
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.success) {
-                            // Update button appearance
                             this.classList.add('completed');
+                            this.classList.remove('processing');
                             this.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
                             this.disabled = true;
-                            
-                            // Show success message
-                            showNotification('Video marked as complete!', 'success');
+                            showNotification(`Video marked as complete! Progress: ${Math.round(data.progress)}%`, 'success');
                         } else {
-                            // Re-enable button on error
+                            this.classList.remove('processing');
                             this.disabled = false;
                             this.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
-                            showNotification('Error marking video as complete. Please try again.', 'error');
+                            showNotification(data.error || 'Error marking video as complete.', 'error');
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
-                        // Re-enable button on error
+                        console.error('Error marking video as complete:', error);
+                        this.classList.remove('processing');
                         this.disabled = false;
                         this.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
-                        showNotification('Error marking video as complete. Please try again.', 'error');
+                        showNotification('Failed to mark video as complete. Please try again.', 'error');
                     });
                 });
             });
             
-            // Function to show notifications
             function showNotification(message, type) {
                 const notification = document.createElement('div');
                 notification.className = `notification ${type}`;
@@ -734,34 +623,28 @@
                 
                 document.body.appendChild(notification);
                 
-                // Remove notification after 3 seconds
                 setTimeout(() => {
                     notification.style.animation = 'slideOut 0.3s ease';
                     setTimeout(() => {
-                        document.body.removeChild(notification);
+                        notification.remove();
                     }, 300);
                 }, 3000);
             }
 
-            // Generate Videos functionality
             const generateVideosBtn = document.getElementById('generate-videos-btn');
             const videoLoader = document.getElementById('video-loader-wrapper');
             
             if (generateVideosBtn) {
                 generateVideosBtn.addEventListener('click', function() {
-                    // Disable button and show loader
                     generateVideosBtn.disabled = true;
                     generateVideosBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
                     videoLoader.style.display = 'flex';
                     
-                    // Get CSRF token
                     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
                     
-                    // Create AbortController for timeout
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+                    const timeoutId = setTimeout(() => controller.abort(), 120000);
                     
-                    // Make request to generate videos
                     fetch('{% url "generate_videos" %}', {
                         method: 'POST',
                         headers: {
@@ -775,7 +658,6 @@
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                        
                         const contentType = response.headers.get('content-type');
                         if (contentType && contentType.includes('application/json')) {
                             return response.json();
@@ -787,48 +669,37 @@
                         }
                     })
                     .then(data => {
-                        // Clear timeout
                         clearTimeout(timeoutId);
-                        
-                        // Hide loader
                         videoLoader.style.display = 'none';
                         
                         if (data.success) {
                             showNotification(data.message, 'success');
-                            // Reload page to show new videos
                             setTimeout(() => {
                                 window.location.reload();
                             }, 2000);
                         } else {
                             showNotification(data.error || 'Failed to generate videos', 'error');
-                            // Re-enable button
                             generateVideosBtn.disabled = false;
                             generateVideosBtn.innerHTML = '<i class="fas fa-video"></i> Generate Videos';
                         }
                     })
                     .catch(error => {
-                        // Clear timeout
                         clearTimeout(timeoutId);
-                        
                         console.error('Error:', error);
                         videoLoader.style.display = 'none';
-                        
                         let errorMessage = 'An error occurred while generating videos. Please try again.';
                         if (error.name === 'AbortError') {
                             errorMessage = 'Video generation timed out. Please try again with a stable connection.';
                         } else if (error.message.includes('500')) {
                             errorMessage = 'Server error occurred. Please try again in a few moments.';
                         }
-                        
                         showNotification(errorMessage, 'error');
-                        // Re-enable button
                         generateVideosBtn.disabled = false;
                         generateVideosBtn.innerHTML = '<i class="fas fa-video"></i> Generate Videos';
                     });
                 });
             }
 
-            // Burger menu functionality
             const burgerMenu = document.getElementById('burger-menu');
             const playlistSidebar = document.getElementById('playlist-sidebar');
             if (burgerMenu && playlistSidebar) {
@@ -837,38 +708,6 @@
                     playlistSidebar.classList.toggle('active');
                 });
             }
-
-            // Collapsible topic sections
-            const topicTitles = document.querySelectorAll('.topic-title');
-            topicTitles.forEach(title => {
-                title.addEventListener('click', () => {
-                    const topicSection = title.parentElement;
-                    const ul = topicSection.querySelector('ul');
-                    if (ul.style.display === 'none') {
-                        ul.style.display = 'block';
-                        topicSection.classList.remove('collapsed');
-                    } else {
-                        ul.style.display = 'none';
-                        topicSection.classList.add('collapsed');
-                    }
-                });
-            });
         });
     </script>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    // Initialize collapsible state
-    document.addEventListener('DOMContentLoaded', function() {
-        const topicSections = document.querySelectorAll('.topic-section');
-        topicSections.forEach(section => {
-            const ul = section.querySelector('ul');
-            if (!section.querySelector('li.active')) {
-                ul.style.display = 'none';
-                section.classList.add('collapsed');
-            }
-        });
-    });
-</script>
 {% endblock %}
