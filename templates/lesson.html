@@ -25,32 +25,92 @@
         }
         .playlist-sidebar {
             flex: 1;
-            background-color: var(--background-white);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: var(--soft-shadow);
+            background: linear-gradient(145deg, #ffffff, #f1f5f9);
+            padding: 24px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 0 15px rgba(255, 255, 255, 0.5);
             max-height: 600px;
             margin-top: 30px;
             overflow-y: auto;
+            position: relative;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(209, 213, 219, 0.3);
+        }
+        .playlist-sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .playlist-sidebar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 12px;
+        }
+        .playlist-sidebar::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #3b82f6, #60a5fa);
+            border-radius: 12px;
         }
         .playlist-sidebar h3 {
-            color: var(--secondary-indigo);
-            margin-top: 0;
-            margin-bottom: 20px;
+            color: #1e40af;
+            margin: 0 0 24px;
+            font-size: 1.6em;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, #2563eb, #7dd3fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+            padding-bottom: 8px;
+        }
+        .playlist-sidebar h3::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #2563eb, #7dd3fc);
+            border-radius: 2px;
         }
         .topic-section {
-            margin-bottom: 25px;
-            border-bottom: 1px solid var(--subtle-divider-gray);
+            margin-bottom: 20px;
             padding-bottom: 15px;
+            position: relative;
         }
-        .topic-section:last-child {
-            border-bottom: none;
+        .topic-section:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(209, 213, 219, 0.5), transparent);
         }
         .topic-title {
-            font-weight: bold;
-            color: var(--primary-blue);
-            margin-bottom: 10px;
-            font-size: 1.1em;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 12px;
+            font-size: 1.25em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.7);
+        }
+        .topic-title:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+        }
+        .topic-title::before {
+            content: '⚬';
+            font-size: 1em;
+            color: #60a5fa;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        .topic-section.collapsed .topic-title::before {
+            transform: rotate(90deg);
+            color: #93c5fd;
         }
         .playlist-sidebar ul {
             list-style: none;
@@ -58,22 +118,46 @@
             margin: 0;
         }
         .playlist-sidebar li {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             cursor: pointer;
-            padding: 8px 12px;
-            border-radius: 6px;
+            padding: 12px 16px;
+            border-radius: 12px;
             transition: all 0.3s ease;
-            font-size: 0.9em;
-            border: 1px solid transparent;
+            font-size: 0.95em;
+            color: #374151;
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(209, 213, 219, 0.4);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .playlist-sidebar li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background: transparent;
+            transition: background 0.3s ease;
         }
         .playlist-sidebar li:hover {
-            background-color: var(--soft-gray-accent);
-            border-color: var(--primary-blue);
+            background: rgba(59, 130, 246, 0.15);
+            color: #1e40af;
+            transform: translateX(8px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
+        }
+        .playlist-sidebar li:hover::before {
+            background: #60a5fa;
         }
         .playlist-sidebar li.active {
-            background-color: var(--primary-blue);
-            color: white;
-            border-color: var(--primary-blue);
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+            color: #ffffff;
+            border: 1px solid transparent;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .playlist-sidebar li.active::before {
+            background: #ffffff;
         }
         .video-container {
             position: relative;
@@ -289,6 +373,82 @@
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
         }
+
+        /* Burger menu button */
+        .burger-menu {
+            display: none;
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 1000;
+            background: linear-gradient(135deg, #2563eb, #60a5fa);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .burger-menu:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .burger-menu span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: #ffffff;
+            margin: 5px 0;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        .burger-menu.active span:nth-child(1) {
+            transform: rotate(45deg) translate(7px, 7px);
+        }
+        .burger-menu.active span:nth-child(2) {
+            opacity: 0;
+        }
+        .burger-menu.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -7px);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .lesson-main-content {
+                flex-direction: column;
+            }
+            .playlist-sidebar {
+                display: none;
+                position: fixed;
+                top: 100px;
+                right: 0;
+                width: 80%;
+                max-width: 300px;
+                height: 100%;
+                margin-top: 0;
+                padding: 20px;
+                border-radius: 0;
+                z-index: 999;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            }
+            .playlist-sidebar.active {
+                display: block;
+                transform: translateX(0);
+            }
+            .burger-menu {
+                display: block;
+            }
+            .playlist-sidebar h3 {
+                font-size: 1.4em;
+            }
+            .topic-title {
+                font-size: 1.15em;
+            }
+            .playlist-sidebar li {
+                font-size: 0.9em;
+                padding: 10px 12px;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -335,9 +495,17 @@
             </div>
         </div>
 
+        <!-- Burger Menu Button -->
+        <button class="burger-menu" id="burger-menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
         {% if recommended_videos %}
             <!-- Debug info -->
             <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px;">
+                <p><strong>Video generation is limited to 5-10 videos for fast testing purpose</strong></p>
                 <strong>Debug Info:</strong> Found {{ recommended_videos|length }} topics with videos
                 {% for topic_data in recommended_videos %}
                     <br>- {{ topic_data.topic }}: {{ topic_data.videos|length }} videos
@@ -386,7 +554,7 @@
                     </div>
                 </div>
                 
-                <div class="playlist-sidebar">
+                <div class="playlist-sidebar" id="playlist-sidebar">
                     <h3>Video Playlist</h3>
                     {% for topic_data in recommended_videos %}
                         <div class="topic-section">
@@ -482,6 +650,10 @@
                 item.addEventListener('click', () => {
                     currentVideoIndex = index;
                     updateVideoDisplay();
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('playlist-sidebar').classList.remove('active');
+                        document.getElementById('burger-menu').classList.remove('active');
+                    }
                 });
             });
 
@@ -658,12 +830,48 @@
                     });
                 });
             }
+
+            // Burger menu functionality
+            const burgerMenu = document.getElementById('burger-menu');
+            const playlistSidebar = document.getElementById('playlist-sidebar');
+            if (burgerMenu && playlistSidebar) {
+                burgerMenu.addEventListener('click', () => {
+                    burgerMenu.classList.toggle('active');
+                    playlistSidebar.classList.toggle('active');
+                });
+            }
+
+            // Collapsible topic sections
+            const topicTitles = document.querySelectorAll('.topic-title');
+            topicTitles.forEach(title => {
+                title.addEventListener('click', () => {
+                    const topicSection = title.parentElement;
+                    const ul = topicSection.querySelector('ul');
+                    if (ul.style.display === 'none') {
+                        ul.style.display = 'block';
+                        topicSection.classList.remove('collapsed');
+                    } else {
+                        ul.style.display = 'none';
+                        topicSection.classList.add('collapsed');
+                    }
+                });
+            });
         });
     </script>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-
+    // Initialize collapsible state
+    document.addEventListener('DOMContentLoaded', function() {
+        const topicSections = document.querySelectorAll('.topic-section');
+        topicSections.forEach(section => {
+            const ul = section.querySelector('ul');
+            if (!section.querySelector('li.active')) {
+                ul.style.display = 'none';
+                section.classList.add('collapsed');
+            }
+        });
+    });
 </script>
 {% endblock %}
