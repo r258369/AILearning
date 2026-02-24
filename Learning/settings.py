@@ -15,7 +15,7 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-GEMINI_API_KEY = "AIzaSyCQytywPJB33ldrGwCqXFmtF4NnHTWsw3w"
+GEMINI_API_KEY = "AIzaSyBg42kQ8TU4JkJfNqGzNdPjVr6iKaD67lw"
 #AIzaSyCQytywPJB33ldrGwCqXFmtF4NnHTWsw3w
 #AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
 
