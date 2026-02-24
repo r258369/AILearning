@@ -33,8 +33,6 @@ from django.shortcuts import render
 from django.http import HttpResponse
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
-#AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys
-#AIzaSyCQytywPJB33ldrGwCqXFmtF4NnHTWsw3w
 
 #Youtube api RH: AIzaSyAqPQ6uGc9pRSM2pizKh_jCCq4PH1RHbAg
 #Youtube api RR: AIzaSyBjBuvcUMEqCX6fafa4KcF8pMzmEL-M49Q
@@ -570,7 +568,42 @@ def delete_note_from_firestore(user_id, course_name, topic):
         return False
 
 
+
+def track_learning_activity(user_id, activity_type):
+    """
+    Track user learning activities for the contribution heatmap.
+    activity_type: 'syllabus', 'notes', 'video', 'quiz'
+    """
+    try:
+        today = timezone.now().strftime('%Y-%m-%d')
+        doc_ref = db.collection('user_profiles').document(user_id).collection('daily_activity').document(today)
+        
+        doc = doc_ref.get()
+        if doc.exists:
+            doc_ref.update({
+                'count': firestore.Increment(1),
+                f'activities.{activity_type}': firestore.Increment(1),
+                'last_updated': firestore.SERVER_TIMESTAMP
+            })
+        else:
+            doc_ref.set({
+                'date': today,
+                'count': 1,
+                'activities': {
+                    'syllabus': 1 if activity_type == 'syllabus' else 0,
+                    'notes': 1 if activity_type == 'notes' else 0,
+                    'video': 1 if activity_type == 'video' else 0,
+                    'quiz': 1 if activity_type == 'quiz' else 0,
+                },
+                'last_updated': firestore.SERVER_TIMESTAMP
+            })
+        return True
+    except Exception as e:
+        print(f"Error tracking activity: {e}")
+        return False
+
 def landing_view(request):
+
     if request.user.is_authenticated:
         return redirect('dashboard')
     return render(request, 'landing.html')
@@ -796,6 +829,9 @@ Just give me the **content portion** that I can embed directly into my existing 
                         'last_updated': firestore.SERVER_TIMESTAMP
                     })
                     print(f"DEBUG: Generated syllabus saved to Firebase")
+                    
+                    # Track activity
+                    track_learning_activity(firebase_uid, 'syllabus')
 
                     # Generate suggested video titles for each topic as list
                     print(f"DEBUG: Starting video title generation")
@@ -896,11 +932,20 @@ Example output (as list of strings):
         video_response = model.generate_content(video_prompt)
         # Convert to Python list safely
         try:
-            suggested_videos_list = eval(video_response.text.strip())
+            # More robust parsing for JSON list
+            content = video_response.text.strip()
+            # Remove markdown code blocks if present
+            if content.startswith('```'):
+                content = re.sub(r'^```[a-z]*\n', '', content)
+                content = re.sub(r'\n```$', '', content)
+            
+            suggested_videos_list = json.loads(content)
             if not isinstance(suggested_videos_list, list):
                 suggested_videos_list = []
-        except Exception:
-            suggested_videos_list = []
+        except Exception as e:
+            print(f"DEBUG: Failed to parse video list JSON: {e}")
+            # Fallback to a simpler regex if JSON fails
+            suggested_videos_list = re.findall(r'"([^"]+)"', video_response.text)
 
         print(f"DEBUG: Video titles generated successfully: {len(suggested_videos_list)} titles")
 
@@ -1048,11 +1093,26 @@ def dashboard_view(request):
                     'status': course.get('status', 'Not Started')
                 })
 
+            # Fetch heatmap data for the current year
+            current_year = timezone.now().year
+            heatmap_data = {}
+            try:
+                activity_docs = db.collection('user_profiles').document(firebase_uid).collection('daily_activity')\
+                    .where('date', '>=', f"{current_year}-01-01")\
+                    .where('date', '<=', f"{current_year}-12-31")\
+                    .stream()
+                for activity_doc in activity_docs:
+                    data = activity_doc.to_dict()
+                    heatmap_data[data['date']] = data['count']
+            except Exception as e:
+                print(f"Error fetching heatmap data: {e}")
+
     context = {
         'user_profile': user_profile,
         'courses_progress': courses_progress,
         'badges': badges,
         'quiz_results_history': json.dumps(quiz_results_history, default=str),
+        'heatmap_data': json.dumps(heatmap_data),
     }
     return render(request, 'dashboard.html', context)
 
@@ -1354,6 +1414,9 @@ def quiz_view(request):
                                 'incorrect': incorrect_count
                             }])
                         }, merge=True)
+                        
+                        # Track activity
+                        track_learning_activity(firebase_uid, 'quiz')
 
                     # Parse the generated HTML to ensure only body content is used
                     soup = BeautifulSoup(verification_results_html, 'html.parser')
@@ -1525,6 +1588,7 @@ def logout_view(request):
 #!.......Mark a video as complete........
 @login_required
 @require_POST
+
 def mark_video_complete(request):
     try:
         data = json.loads(request.body)
@@ -1632,6 +1696,9 @@ def mark_video_complete(request):
             'all_courses': all_courses
         }, merge=True)
         
+        # Track activity
+        track_learning_activity(firebase_uid, 'video')
+        
         return JsonResponse({
             'success': True,
             'message': 'Video marked as complete',
@@ -1641,7 +1708,6 @@ def mark_video_complete(request):
     except Exception as e:
         print(f"Error marking video complete: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
-
 @login_required
 @require_POST  
 def clear_user_cache(request):
@@ -1768,6 +1834,9 @@ def generate_study_notes(request):
                         'course_name': determined_course_name
                     })
                     print(f"DEBUG: Successfully generated note for: {topic}")
+                    
+                    # Track activity
+                    track_learning_activity(firebase_uid, 'notes')
                 
                 # Memory cleanup after each note
                 import gc
@@ -1932,20 +2001,20 @@ def migrate_user_notes(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def chat_api(request):
-    genai.configure(api_key="AIzaSyBXQvI2hY5j0bir7LhZP6-fjH_DABSViys")
+    genai.configure(api_key="AIzaSyBg42kQ8TU4JkJfNqGzNdPjVr6iKaD67lw")
     try:
-        # Parse incoming JSON
+        # incoming JSON
         data = json.loads(request.body)
         user_message = data.get('message', '').strip()
         
         if not user_message:
             return JsonResponse({'error': 'Message is required'}, status=400)
 
-        # Call Gemini API
+        # Call Gemini
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(user_message)
 
-        # Extract response text
+        #response text
         content = response.text if hasattr(response, "text") else str(response)
         print(f"Gemini response: {content}")  # Debugging output
         return JsonResponse({'success': True, 'response': content})
@@ -1975,3 +2044,96 @@ def test_gemini_connection(request):
             'success': False,
             'error': f'Gemini API test failed: {str(e)}'
         })
+
+@login_required
+@csrf_exempt
+@require_http_methods(["GET", "POST", "PUT", "DELETE"])
+def task_notes_api(request):
+    """
+    API to handle task-like notes stored in Firebase Firestore.
+    """
+    firebase_uid = request.session.get('firebase_user', {}).get('uid')
+    if not firebase_uid:
+        return JsonResponse({'success': False, 'error': 'User not authenticated'}, status=401)
+
+    notes_ref = db.collection('user_profiles').document(firebase_uid).collection('task_notes')
+
+    if request.method == "GET":
+        try:
+            docs = notes_ref.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+            notes = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                notes.append(data)
+            return JsonResponse({'success': True, 'notes': notes})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            title = data.get('title', '').strip()
+            text = data.get('text', '').strip()
+            if not text:
+                return JsonResponse({'success': False, 'error': 'Note text is required'}, status=400)
+
+            new_note = {
+                'title': title,
+                'text': text,
+                'is_highlighted': data.get('is_highlighted', False),
+                'created_at': firestore.SERVER_TIMESTAMP,
+                'updated_at': firestore.SERVER_TIMESTAMP
+            }
+            _, reference = notes_ref.add(new_note)
+            
+            return JsonResponse({
+                'success': True, 
+                'note': {
+                    'id': reference.id,
+                    'title': title,
+                    'text': text,
+                    'is_highlighted': False
+                }
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    elif request.method == "PUT":
+        try:
+            data = json.loads(request.body)
+            note_id = data.get('id')
+            if not note_id:
+                return JsonResponse({'success': False, 'error': 'Note ID is required'}, status=400)
+
+            update_data = {
+                'updated_at': firestore.SERVER_TIMESTAMP
+            }
+            if 'title' in data: update_data['title'] = data['title']
+            if 'text' in data: update_data['text'] = data['text']
+            if 'is_highlighted' in data: update_data['is_highlighted'] = data['is_highlighted']
+            if 'completed' in data: update_data['completed'] = data['completed']
+
+            notes_ref.document(note_id).update(update_data)
+            return JsonResponse({'success': True, 'message': 'Note updated'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    elif request.method == "DELETE":
+        try:
+            note_id = request.GET.get('id')
+            if not note_id and request.body:
+                try:
+                    data = json.loads(request.body)
+                    note_id = data.get('id')
+                except: pass
+                
+            if not note_id:
+                return JsonResponse({'success': False, 'error': 'Note ID is required'}, status=400)
+
+            notes_ref.document(note_id).delete()
+            return JsonResponse({'success': True, 'message': 'Note deleted'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
