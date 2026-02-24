@@ -328,6 +328,278 @@
                 transform: translateY(0) scale(1); 
             } 
         }
+
+        /* Floating Notes Sidebar */
+        #notesToggleButton {
+            position: fixed;
+            bottom: 80px;
+            right: 30px;
+            z-index: 1001;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(5, 150, 105, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #notesToggleButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(5, 150, 105, 0.4);
+        }
+
+        #notesSidebarWrapper {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 380px;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 2000;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.3);
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #notesSidebarWrapper.show {
+            right: 0;
+        }
+
+        .notes-header {
+            padding: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+        }
+
+        .notes-header h2 {
+            color: white;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+        }
+
+        .close-notes {
+            color: #94a3b8;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .close-notes:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .notes-list-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .note-task-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideIn 0.3s ease-out;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .note-task-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .note-task-item.highlighted {
+            background: rgba(250, 204, 21, 0.15);
+            border-color: rgba(250, 204, 21, 0.4);
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.1);
+        }
+
+        .note-task-item.highlighted .note-text {
+            color: #fefce8;
+            /* highlight effect */
+            background: linear-gradient(120deg, rgba(234, 179, 8, 0.2) 0%, rgba(234, 179, 8, 0.2) 100%);
+            background-repeat: no-repeat;
+            background-size: 100% 0.4em;
+            background-position: 0 88%;
+        }
+
+        .note-header-clickable {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .note-title-display {
+            font-weight: 700;
+            color: #10b981;
+            font-size: 0.95rem;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .collapse-icon {
+            font-size: 0.8rem;
+            color: #64748b;
+            transition: transform 0.3s;
+        }
+
+        .note-task-item:not(.collapsed) .collapse-icon {
+            transform: rotate(180deg);
+        }
+
+        .note-content-wrapper {
+            max-height: 1000px;
+            opacity: 1;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .note-task-item.collapsed .note-content-wrapper {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+            pointer-events: none;
+        }
+
+        .note-text {
+            flex: 1;
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .note-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .note-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-edit { color: #60a5fa; }
+        .btn-edit:hover { color: #3b82f6; transform: scale(1.1); }
+        
+        .btn-highlight { color: #fbbf24; }
+        .btn-highlight:hover { color: #f59e0b; transform: scale(1.1); }
+        
+        .btn-delete { color: #94a3b8; }
+        .btn-delete:hover { color: #ef4444; transform: scale(1.1); }
+
+        .add-note-container {
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .add-note-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #noteTitleInput, #noteInput {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: white;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #noteInput {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        #noteTitleInput:focus, #noteInput:focus {
+            border-color: #10b981;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .highlight-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .add-note-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .edit-mode .note-display { display: none; }
+        .edit-form { display: none; flex-direction: column; gap: 8px; }
+        .edit-mode .edit-form { display: flex; }
+
+        @media (max-width: 480px) {
+            #notesSidebarWrapper {
+                width: 100%;
+                right: -100%;
+            }
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -397,6 +669,11 @@
         </div>
     </footer>
 
+    <!-- Floating Buttons -->
+    <button id="notesToggleButton">
+        <i class="fas fa-sticky-note"></i> My Notes
+    </button>
+
     <!-- Floating Chat Button -->
     <button id="chatToggleButton">
         <i class="fas fa-comments"></i> Ask AI
@@ -424,6 +701,37 @@
                     <button type="submit" class="send-button" id="sendButton">Send</button>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- Notes Sidebar -->
+    <div id="notesSidebarWrapper">
+        <div class="notes-header">
+            <h2><i class="fas fa-pencil-alt" style="color:#10b981;"></i> Learning Tasks</h2>
+            <button class="close-notes" id="closeNotes">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="notes-list-container" id="notesList">
+            <!-- Notes will be loaded here -->
+            <div style="text-align: center; color: #64748b; margin-top: 50px;">
+                <i class="fas fa-clipboard-list" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                <p>No notes yet. Add your first task!</p>
+            </div>
+        </div>
+        <div class="add-note-container">
+            <form class="add-note-form" id="addNoteForm">
+                <input type="text" id="noteTitleInput" placeholder="Note Title (Optional)..." autocomplete="off">
+                <textarea id="noteInput" placeholder="Write your note here..." required autocomplete="off"></textarea>
+                <div class="form-actions">
+                    <label class="highlight-toggle-label">
+                        <input type="checkbox" id="noteHighlightToggle"> Highlight
+                    </label>
+                    <button type="submit" class="add-note-btn">
+                        <i class="fas fa-plus"></i> Add Note
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -484,6 +792,8 @@
 
         // Chat System Class
         class ChatSystem {
+            // ... (keeping existing ChatSystem code)
+
             constructor() {
                 this.chatMessages = document.getElementById('chatMessages');
                 this.chatForm = document.getElementById('chatForm');
@@ -596,9 +906,225 @@
             }
         }
 
-        // Initialize chat system when DOM is loaded
+        class TaskNoteSystem {
+            constructor() {
+                this.sidebar = document.getElementById('notesSidebarWrapper');
+                this.toggleBtn = document.getElementById('notesToggleButton');
+                this.closeBtn = document.getElementById('closeNotes');
+                this.notesList = document.getElementById('notesList');
+                this.form = document.getElementById('addNoteForm');
+                this.titleInput = document.getElementById('noteTitleInput');
+                this.input = document.getElementById('noteInput');
+                this.highlightToggle = document.getElementById('noteHighlightToggle');
+
+                this.init();
+            }
+
+            init() {
+                this.toggleBtn.addEventListener('click', () => {
+                    this.sidebar.classList.toggle('show');
+                    if (this.sidebar.classList.contains('show')) {
+                        this.loadNotes();
+                    }
+                });
+
+                this.closeBtn.addEventListener('click', () => {
+                    this.sidebar.classList.remove('show');
+                });
+
+                this.form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addNote();
+                });
+
+                // Close on outside click
+                document.addEventListener('click', (e) => {
+                    if (this.sidebar && !this.sidebar.contains(e.target) && !this.toggleBtn.contains(e.target)) {
+                        this.sidebar.classList.remove('show');
+                    }
+                });
+            }
+
+            async loadNotes() {
+                this.notesList.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;"><i class="fas fa-spinner fa-spin"></i> Loading notes...</div>';
+                try {
+                    const res = await fetch('/api/task-notes/');
+                    const data = await res.json();
+                    if (data.success) {
+                        this.renderNotes(data.notes);
+                    }
+                } catch (err) {
+                    console.error('Failed to load notes', err);
+                }
+            }
+
+            renderNotes(notes) {
+                if (!notes || notes.length === 0) {
+                    this.notesList.innerHTML = `
+                        <div style="text-align: center; color: #64748b; margin-top: 50px;">
+                            <i class="fas fa-clipboard-list" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                            <p>Your workspace is clear. Take some notes!</p>
+                        </div>`;
+                    return;
+                }
+
+                this.notesList.innerHTML = notes.map(note => `
+                    <div class="note-task-item ${note.is_highlighted ? 'highlighted' : ''} collapsed" id="note-${note.id}" onclick="window.noteSystem.toggleCollapse('${note.id}')">
+                        <div class="note-header-clickable">
+                            <div class="note-title-display">${this.escapeHTML(note.title || 'Untitled Note')}</div>
+                            <i class="fas fa-chevron-down collapse-icon"></i>
+                        </div>
+                        <div class="note-content-wrapper">
+                            <div class="note-display">
+                                <div class="note-text">${this.escapeHTML(note.text)}</div>
+                                <div class="note-actions" onclick="event.stopPropagation()">
+                                    <button class="note-btn btn-highlight" onclick="window.noteSystem.toggleHighlight('${note.id}', ${!note.is_highlighted})">
+                                        <i class="fas fa-highlighter"></i>
+                                    </button>
+                                    <button class="note-btn btn-edit" onclick="window.noteSystem.enterEditMode('${note.id}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="note-btn btn-delete" onclick="window.noteSystem.deleteNote('${note.id}')">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="edit-form" id="edit-form-${note.id}" onclick="event.stopPropagation()">
+                                <input type="text" class="edit-title" value="${this.escapeHTML(note.title || '')}" style="background:rgba(0,0,0,0.2); border:1px solid #10b981; color:white; padding:5px; margin-bottom:5px; border-radius:5px;">
+                                <textarea class="edit-text" style="background:rgba(0,0,0,0.2); border:1px solid #10b981; color:white; padding:5px; margin-bottom:5px; border-radius:5px; min-height:80px;">${this.escapeHTML(note.text)}</textarea>
+                                <div style="display:flex; justify-content:flex-end; gap:5px;">
+                                    <button onclick="window.noteSystem.cancelEdit('${note.id}')" style="background:#475569; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">Cancel</button>
+                                    <button onclick="window.noteSystem.saveEdit('${note.id}')" style="background:#10b981; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                window.noteSystem = this;
+            }
+
+            toggleCollapse(id) {
+                const item = document.getElementById(`note-${id}`);
+                if (item.classList.contains('edit-mode')) return;
+                item.classList.toggle('collapsed');
+            }
+
+            async addNote() {
+                const title = this.titleInput.value.trim();
+                const text = this.input.value.trim();
+                const is_highlighted = this.highlightToggle.checked;
+                
+                if (!text) return;
+
+                try {
+                    const res = await fetch('/api/task-notes/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({ title, text, is_highlighted })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.titleInput.value = '';
+                        this.input.value = '';
+                        this.highlightToggle.checked = false;
+                        this.loadNotes();
+                    }
+                } catch (err) {
+                    console.error('Failed to add note', err);
+                }
+            }
+
+            enterEditMode(id) {
+                const item = document.getElementById(`note-${id}`);
+                item.classList.add('edit-mode');
+            }
+
+            cancelEdit(id) {
+                const item = document.getElementById(`note-${id}`);
+                item.classList.remove('edit-mode');
+            }
+
+            async saveEdit(id) {
+                const item = document.getElementById(`note-${id}`);
+                const title = item.querySelector('.edit-title').value;
+                const text = item.querySelector('.edit-text').value;
+
+                try {
+                    const res = await fetch('/api/task-notes/', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({ id, title, text })
+                    });
+                    if ((await res.json()).success) {
+                        this.loadNotes();
+                    }
+                } catch (err) {
+                    console.error('Failed to save edit', err);
+                }
+            }
+
+            async toggleHighlight(id, status) {
+                try {
+                    const res = await fetch('/api/task-notes/', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({ id, is_highlighted: status })
+                    });
+                    if ((await res.json()).success) {
+                        this.loadNotes();
+                    }
+                } catch (err) {
+                    console.error('Failed to toggle highlight', err);
+                }
+            }
+
+            async deleteNote(id) {
+                if (!confirm('Delete this note?')) return;
+                try {
+                    const res = await fetch(`/api/task-notes/?id=${id}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': this.getCookie('csrftoken') }
+                    });
+                    if ((await res.json()).success) this.loadNotes();
+                } catch (err) { console.error('Failed to delete note', err); }
+            }
+
+            getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            escapeHTML(str) {
+                const p = document.createElement('p');
+                p.textContent = str;
+                return p.innerHTML;
+            }
+        }
+
+        // Initialize systems when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             new ChatSystem();
+            new TaskNoteSystem();
         });
     </script>
     {% block extra_js %}{% endblock %}
