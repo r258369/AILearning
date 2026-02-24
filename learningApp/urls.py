@@ -13,11 +13,12 @@ urlpatterns = [
     path('quiz/', views.quiz_view, name='quiz'),
     path('notes/', views.notes_view, name='notes'),
     path('settings-feedback/', views.settings_feedback_view, name='settings_feedback'),
-    path('syllabus/', views.syllabus_view, name='syllabus'), # New syllabus page
+    path('syllabus/', views.syllabus_view, name='syllabus'),
     path('logout/', views.logout_view, name='logout'),
     path('mark-video-complete/', views.mark_video_complete, name='mark_video_complete'),
     path('generate-study-notes/', views.generate_study_notes, name='generate_study_notes'),
     path('generate-videos/', views.generate_videos_view, name='generate_videos'),
     path('clear-cache/', views.clear_user_cache, name='clear_cache'),
-    path('test-gemini/', views.test_gemini_connection, name='test_gemini'),
+     path('test-gemini/', views.test_gemini_connection, name='test_gemini'),
+    path('api/task-notes/', views.task_notes_api, name='task_notes_api'),
 ]
