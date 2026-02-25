@@ -2001,7 +2001,7 @@ def migrate_user_notes(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def chat_api(request):
-    genai.configure(api_key="AIzaSyBg42kQ8TU4JkJfNqGzNdPjVr6iKaD67lw")
+    genai.configure(api_key=settings.GEMINI_API_KEY)
     try:
         # incoming JSON
         data = json.loads(request.body)
