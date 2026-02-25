@@ -160,6 +160,29 @@
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
+    .btn-delete-parent {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        padding: 10px;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: left;
+        z-index: 100;
+        margin-right: 50px;
+        order: 3;
+    }
+
+    .btn-delete-parent:hover {
+        background: rgba(239, 68, 68, 0.8);
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    }
+
     .trigger:hover {
         background: rgba(255, 255, 255, 0.2);
         transform: scale(1.01); /* Slightly less scale on hover */
@@ -319,9 +342,8 @@
         justify-content: center;
     }
 
-    .btn-view, .btn-download {
-        padding: 10px 20px;
-        background: linear-gradient(135deg, #0fbe77 0%, #0c9c64 100%); /* Green gradient */
+    .btn-view, .btn-download, .btn-delete {
+        padding: 10px 10px;
         color: white;
         border-radius: 8px;
         text-decoration: none;
@@ -332,14 +354,25 @@
         gap: 8px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         white-space: nowrap;
+        border: none;
+        cursor: pointer;
+        max-width: 84px;    
     }
 
-    .btn-view:hover, .btn-download:hover {
+    .btn-view, .btn-download {
+        background: linear-gradient(135deg, #0fbe77 0%, #0c9c64 100%); /* Green gradient */
+    }
+
+    .btn-delete {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); /* Red gradient */
+    }
+
+    .btn-view:hover, .btn-download:hover, .btn-delete:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
     }
 
-    .btn-view i, .btn-download i {
+    .btn-view i, .btn-download i, .btn-delete i {
         font-size: 1.1em;
     }
 
@@ -494,12 +527,12 @@
             width: 100%;
         }
 
-        .btn-view, .btn-download {
+        .btn-view, .btn-download, .btn-delete {
             width: 100%;            /* Already there */
             justify-content: center; /* Already there */
-            padding: 12px 20px;     /* Already there */
+            padding: 12px 30px;     /* Already there */
             font-size: 0.95rem;     /* Already there */
-            max-width: 74px;       /* ADD THIS - better touch target */
+            max-width: 84;       /* Responsive full width on mobile */
         }
 
         .notification {
@@ -564,10 +597,10 @@
             margin-bottom: 12px;
         }
 
-        .btn-view, .btn-download {
-            padding: 10px 16px;     /* Already there */
+        .btn-view, .btn-download, .btn-delete {
+            padding: 10px 36px;     /* Already there */
             font-size: 0.9rem;      /* Already there */
-            max-width: 74px;       /* ADD THIS - maintain touch target */
+            max-width: 84;       /* Responsive full width on mobile */
         }
 
         .empty-state {
@@ -691,6 +724,9 @@
           class="trigger"
         >
             <span class="course-name-display">{{ course_name }} Notes</span>
+            <button type="button" class="btn-delete-parent" title="Delete entire course" onclick="event.stopPropagation(); event.preventDefault(); window.deleteCourseNotes('{{ course_name }}')">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </label>
 
         <ul class="list webkit-scrollbar" role="list" dir="auto">
@@ -706,6 +742,9 @@
                         <a href="{{ note.pdf_url }}" download class="btn-download">
                             <i class="fas fa-download"></i> Download
                         </a>
+                        <button class="btn-delete" onclick="deleteNote('{{ course_name }}', '{{ note.topic }}')">
+                            <i class="fas fa-trash-alt"></i> Delete
+                        </button>
                     </div>
                 </article>
             </li>
@@ -827,8 +866,65 @@
             generateBtn.style.background = 'var(--gradient-primary)';
         }
         
+        window.deleteCourseNotes = function(courseName) {
+            if (!confirm(`Are you sure you want to delete all notes for "${courseName}"? This action cannot be undone.`)) return;
+            
+            fetch("{% url 'delete_course_notes' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: JSON.stringify({
+                    course_name: courseName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while deleting the course notes.', 'error');
+            });
+        };
+
+        window.deleteNote = function(courseName, topic) {
+            if (!confirm(`Are you sure you want to delete the note for "${topic}"?`)) return;
+            
+            fetch('{% url "delete_study_note" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: JSON.stringify({
+                    course_name: courseName,
+                    topic: topic
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while deleting the note.', 'error');
+            });
+        };
+
         // Add ripple effect to buttons
-        document.querySelectorAll('.btn-view, .btn-download, #generateNotesBtn').forEach(button => {
+        document.querySelectorAll('.btn-view, .btn-download, .btn-delete, #generateNotesBtn').forEach(button => {
             button.addEventListener('click', function(e) {
                 const ripple = document.createElement('span');
                 const rect = this.getBoundingClientRect();
