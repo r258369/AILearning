@@ -1,8 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Study Notes{% endblock %}
-
 {% block extra_css %}
 <style>
     :root {
@@ -29,43 +27,52 @@
         padding: 40px 20px;
     }
 
-    .notes-header {
+    .lesson-header {
         text-align: center;
-        margin-bottom: 40px;
+        margin-bottom: 30px;
     }
 
-    .notes-header h1 {
-        font-size: 2.5em;
+    .lesson-header h1 {
         color: var(--primary-color);
+        margin-bottom: 10px;
+        font-size: 2.5em;
+        font-weight: 700;
     }
 
-    .notes-header p {
-        font-size: 1.1em;
+    .lesson-header p {
         color: var(--text-light);
+        font-size: 1.1rem;
+    }
+
+    .generate-notes-section {
+        margin-top: 20px;
     }
 
     #generateNotesBtn {
-        margin-top: 25px;
-        padding: 12px 24px;
+        padding: 12px 28px;
         border: none;
-        border-radius: 6px;
-        background-color: var(--primary-color);
+        border-radius: 12px;
+        background: var(--gradient-primary);
         color: white;
         font-weight: 600;
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
-        margin-left: auto;
-        margin-right: auto;
-        background: var(--gradient-primary); /* Apply gradient */
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        margin: 20px auto 0;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
     }
 
     #generateNotesBtn:hover {
-        opacity: 0.9;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        opacity: 0.95;
+    }
+
+    #generateNotesBtn:active {
+        transform: translateY(0);
     }
 
     .notification {
@@ -212,6 +219,8 @@
         gap: 12px;
         color: black;
         letter-spacing: 0.5px;
+        word-break: break-word;
+        overflow-wrap: break-word;
     }
 
     .course-name-display::before {
@@ -250,15 +259,16 @@
         border-radius: 12px;
         font-size: 14px;
         font-weight: 500;
-        width: 600px; /* Default width */
-        /* Decreased max-width */
+        width: 100%;
+        max-width: 600px;
         border-color: rgba(148, 163, 231, 0.3);
         background: rgb(245, 245, 245);
         backdrop-filter: blur(10px);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
-        margin: 0 auto; /* Center the cards within the list item */
+        margin: 0 auto;
+        box-sizing: border-box;
     }
 
     .article::before {
@@ -290,6 +300,7 @@
         color: var(--text-dark);
         font-size: 1.1rem;
         font-weight: 600;
+        word-break: break-word;
     }
 
     .article p {
@@ -297,14 +308,15 @@
         margin-bottom: 16px;
         line-height: 1.5;
         font-size: 0.95rem;
+        word-break: break-word;
     }
 
     .note-actions {
         margin-top: 15px;
         display: flex;
         gap: 10px;
-        flex-wrap: wrap; /* Allow buttons to wrap */
-        justify-content: center; /* Center buttons */
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
     .btn-view, .btn-download {
@@ -319,6 +331,7 @@
         align-items: center;
         gap: 8px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        white-space: nowrap;
     }
 
     .btn-view:hover, .btn-download:hover {
@@ -337,8 +350,9 @@
         border-radius: 8px;
         box-shadow: var(--shadow);
         border: 1px solid var(--border-color);
-        max-width: 600px; /* Max width for empty state card */
-        margin: 40px auto; /* Center empty state card */
+        max-width: 600px;
+        margin: 40px auto;
+        width: 90%;
     }
 
     .empty-state h3 {
@@ -406,47 +420,182 @@
         }
     }
 
-    /* Responsive Design */
-    @media (max-width: 768px) {
+    /* Responsive Design - Tablet */
+    @media (max-width: 1024px) {
         .container {
-            padding: 30px 16px;
-        }
-
-        .notes-header h1 {
-            font-size: 2.2em;
+            max-width: 100%;
+            padding: 30px 20px;
         }
 
         .dropdown {
-            margin: 15px auto;
+            max-width: 100%;
+            margin: 20px 0;
+        }
+
+        .article {
+            max-width: 100%;
+        }
+    }
+
+    /* Responsive Design - Mobile Large */
+    @media (max-width: 768px) {
+        .container {
+            padding: 20px 16px;
+        }
+
+        .lesson-header h1 {
+            font-size: 2em;
+        }
+
+        .lesson-header p {
+            font-size: 1em;
+        }
+
+        .dropdown {
+            margin: 15px 0;
+            border-radius: 16px;
         }
 
         .trigger {
             padding: 20px;
+            font-size: 1.1rem;
+        }
+
+        .course-name-display {
+            font-size: 1.1rem;
+        }
+
+        .course-name-display::before {
+            font-size: 1.5rem;
         }
 
         .list {
             padding: 0 16px 16px 16px;
+            gap: 10px;
         }
 
         .article {
             padding: 16px;
-            max-width: 100%; /* Full width on small screens */
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        .article h3 {
+            font-size: 1rem;
+        }
+
+        .article p {
+            font-size: 0.9rem;
         }
 
         .note-actions {
             flex-direction: column;
             gap: 8px;
+            width: 100%;
         }
 
         .btn-view, .btn-download {
-            text-align: center;
-            justify-content: center;
+            width: 100%;            /* Already there */
+            justify-content: center; /* Already there */
+            padding: 12px 20px;     /* Already there */
+            font-size: 0.95rem;     /* Already there */
+            max-width: 74px;       /* ADD THIS - better touch target */
         }
 
         .notification {
             right: 16px;
             left: 16px;
             top: 20px;
+            text-align: center;
+        }
+
+        #generateNotesBtn {
+            width: 100%;
+            max-width: 300px;
+            padding: 14px 24px;
+        }
+    }
+
+    /* Responsive Design - Mobile Small */
+    @media (max-width: 480px) {
+        .lesson-header h1 {
+            font-size: 1.75em;
+        }
+
+        .lesson-header p {
+            font-size: 0.95em;
+        }
+
+        .trigger {
+            padding: 16px;
+            font-size: 1rem;
+        }
+
+        .trigger:before {
+            width: 20px;
+            height: 20px;
+            font-size: 10px;
+        }
+
+        .course-name-display {
+            font-size: 1rem;
+            gap: 8px;
+        }
+
+        .course-name-display::before {
+            font-size: 1.3rem;
+        }
+
+        .list {
+            padding: 0 12px 12px 12px;
+            gap: 8px;
+        }
+
+        .article {
+            padding: 14px;
+        }
+
+        .article h3 {
+            font-size: 0.95rem;
+        }
+
+        .article p {
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+
+        .btn-view, .btn-download {
+            padding: 10px 16px;     /* Already there */
+            font-size: 0.9rem;      /* Already there */
+            max-width: 74px;       /* ADD THIS - maintain touch target */
+        }
+
+        .empty-state {
+            padding: 30px 20px;
+            margin: 30px auto;
+        }
+
+        .empty-state h3 {
+            font-size: 1.2rem;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+    }
+
+    /* Landscape orientation adjustments */
+    @media (max-height: 500px) and (orientation: landscape) {
+        .dropdown input:where(:checked) ~ .list {
+            max-height: 250px;
+        }
+
+        .notification {
+            top: 10px;
+            right: 10px;
+            left: auto;
+            padding: 8px 12px;
+            font-size: 0.9rem;
         }
     }
 
@@ -504,71 +653,79 @@
     }
 </style>
 {% endblock %}
-
 {% block content %}
 <div class="container">
-    <div class="notes-header">
+    <div class="lesson-header">
         <h1>Study Notes</h1>
         <p>Access your personalized study materials and downloadable PDFs.</p>
-        <button id="generateNotesBtn">
-            <i class="fas fa-plus-circle"></i> Generate Study Notes
-        </button>
+        <div class="generate-notes-section">
+            <button id="generateNotesBtn" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Generate Study Notes
+            </button>
+            <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                {% if notes_pdfs %}
+                    Click to regenerate notes with fresh recommendations
+                {% else %}
+                    Generate personalized study notes based on your syllabus
+                {% endif %}
+            </p>
+        </div>
         {% csrf_token %}
         <div id="notification" class="notification"></div>
     </div>
 
-    {% if notes_pdfs %}
-    <div id="notes-accordion-container">
-        {% for course_name, notes_list in notes_pdfs.items %}
-        <div class="dropdown">
-            <input
-              hidden=""
-              class="sr-only"
-              name="state-dropdown-{{ forloop.counter }}"
-              id="state-dropdown-{{ forloop.counter }}"
-              type="checkbox"
-            />
-            <label
-              aria-label="dropdown scrollbar"
-              for="state-dropdown-{{ forloop.counter }}"
-              class="trigger"
-            >
-                <span class="course-name-display">{{ course_name }} Notes</span>
-            </label>
+{% if notes_pdfs %}
+<div id="notes-accordion-container">
+    {% for course_name, notes_list in notes_pdfs.items %}
+    <div class="dropdown">
+        <input
+          hidden=""
+          class="sr-only"
+          name="state-dropdown-{{ forloop.counter }}"
+          id="state-dropdown-{{ forloop.counter }}"
+          type="checkbox"
+        />
+        <label
+          aria-label="dropdown scrollbar"
+          for="state-dropdown-{{ forloop.counter }}"
+          class="trigger"
+        >
+            <span class="course-name-display">{{ course_name }} Notes</span>
+        </label>
 
-            <ul class="list webkit-scrollbar" role="list" dir="auto">
-                {% for note in notes_list %}
-                <li class="listitem" role="listitem">
-                    <article class="article">
-                        <h3>{{ note.topic }}</h3>
-                        <p>Complete study material including notes, quiz, and assignments.</p>
-                        <div class="note-actions">
-                            <a href="{{ note.pdf_url }}" target="_blank" class="btn-view">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            <a href="{{ note.pdf_url }}" download class="btn-download">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </div>
-                    </article>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endfor %}
+        <ul class="list webkit-scrollbar" role="list" dir="auto">
+            {% for note in notes_list %}
+            <li class="listitem" role="listitem">
+                <article class="article">
+                    <h3>{{ note.topic }}</h3>
+                    <p>Complete study material including notes, quiz, and assignments.</p>
+                    <div class="note-actions">
+                        <a href="{{ note.pdf_url }}" target="_blank" class="btn-view">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="{{ note.pdf_url }}" download class="btn-download">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </article>
+            </li>
+            {% endfor %}
+        </ul>
     </div>
-    {% else %}
-    <div class="empty-state">
-        <h3>No Notes Available</h3>
-        <p>Complete the onboarding quiz to generate personalized materials.</p>
-        <a href="{% url 'onboarding_quiz' %}" class="btn-view">
-            <i class="fas fa-play-circle"></i> Start Quiz
-        </a>
-    </div>
-    {% endif %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No Notes Available</h3>
+    <p>Complete the onboarding quiz to generate personalized materials.</p>
+    <a href="{% url 'onboarding_quiz' %}" class="btn-view">
+        <i class="fas fa-play-circle"></i> Start Quiz
+    </a>
+</div>
+{% endif %}
+
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
