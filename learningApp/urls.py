@@ -19,6 +19,8 @@ urlpatterns = [
     path('generate-study-notes/', views.generate_study_notes, name='generate_study_notes'),
     path('generate-videos/', views.generate_videos_view, name='generate_videos'),
     path('clear-cache/', views.clear_user_cache, name='clear_cache'),
-     path('test-gemini/', views.test_gemini_connection, name='test_gemini'),
+    path('test-gemini/', views.test_gemini_connection, name='test_gemini'),
     path('api/task-notes/', views.task_notes_api, name='task_notes_api'),
+    path('delete-study-note/', views.delete_study_note, name='delete_study_note'),
+    path('delete-course-notes/', views.delete_course_notes, name='delete_course_notes'),
 ]
