@@ -1981,6 +1981,43 @@ def delete_study_note(request):
 
 @login_required
 @require_POST
+def delete_course_notes(request):
+    """Delete all study notes for a specific course from Firestore subcollections"""
+    firebase_uid = request.session.get('firebase_user', {}).get('uid')
+    if not firebase_uid:
+        return JsonResponse({'success': False, 'error': 'User not authenticated.'})
+
+    try:
+        data = json.loads(request.body)
+        course_name = data.get('course_name')
+        
+        if not course_name:
+            return JsonResponse({'success': False, 'error': 'Missing course_name.'})
+        
+        sanitized_course_name = re.sub(r'[^a-zA-Z0-9_-]', '_', course_name.lower())
+        
+        # Reference to the notes subcollection
+        notes_ref = db.collection('user_profiles').document(firebase_uid).collection('courses').document(sanitized_course_name).collection('notes')
+        
+        # Firestore doesn't delete subcollections automatically, so we delete each doc
+        docs = notes_ref.stream()
+        deleted_count = 0
+        for doc in docs:
+            doc.reference.delete()
+            deleted_count += 1
+            
+        # Delete the course document itself
+        db.collection('user_profiles').document(firebase_uid).collection('courses').document(sanitized_course_name).delete()
+        
+        return JsonResponse({'success': True, 'message': f'Course "{course_name}" and its {deleted_count} notes deleted successfully!'})
+            
+    except Exception as e:
+        print(f"Error deleting course notes: {e}")
+        return JsonResponse({'success': False, 'error': f'An error occurred: {str(e)}'})
+
+
+@login_required
+@require_POST
 def migrate_user_notes(request):
     """Migrate user's existing notes from old structure to new subcollection structure"""
     firebase_uid = request.session.get('firebase_user', {}).get('uid')
